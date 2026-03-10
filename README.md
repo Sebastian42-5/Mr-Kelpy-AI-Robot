@@ -3,7 +3,7 @@ A driving robot with built in computer vision and an LLM using Raspberry Pi 5 an
 
 Components needed:
 
-- 14 3D printed parts
+- 13 3D printed parts
 - Various M4 and M5 screws
 - Raspberry Pi 5
 - Raspberry Pi Camera Module
