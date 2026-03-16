@@ -24,7 +24,7 @@ Steps to project:
 - claw test
 - wall detection and turn
 - Eye reaction to touch
-- object detection with pi camera and object grabbing
+- object detection with pi camera and object grabbing using YoloV8 and SAM2
 - Face detection 
 - Voice recognition and= direct response
 - Using ChatGPT APIs to import LLM
