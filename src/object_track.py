@@ -2,16 +2,37 @@ import cv2
 import torch
 import os
 from ultralytics import YOLO
+from deepface import Deepface
+
 
 model = YOLO("yolov8n.pt")
 
 cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+
+if not os.path.exists('output_frames'):
+    os.makedirs('output_frames')
+
+frame_count = 0
+frame_skip = 5
+image_count = 0
+
+current_object = 'battery'
+
+os.makedirs(f'output_frames/{current_object}', exist_ok=True)
+
+model.train(data="data.yaml", epochs=100, imgsz=640, batch=16, device=0)
+
 
 try:
     while True:
         timer = cv2.getTickCount()
         fps = cap.get(cv2.CAP_PROP_FPS)
         ret, frame = cap.read()
+
+        frame_count += 1
+
+        if frame_count % frame_skip == 0:
+            cv2.imwrite(f"output_frames/{current_object}_frame_{frame_count}.jpg", frame)
 
         results = model(frame, stream=False)
 
@@ -33,7 +54,6 @@ try:
 
         if cv2.waitKey(1) and 0xff == ord("q"):
             break
-
 finally:
     cap.release()
     cv2.destroyAllWindows()
