@@ -16,3 +16,20 @@ Components needed:
 - 2X 360 rolling wheels
 - Custom PCB for buck conversion and pin management
 - 0.96 inch OLED Display 
+
+
+Steps to project:
+
+- Basic driving
+- claw test
+- wall detection and turn
+- Eye reaction to touch
+- object detection with pi camera and object grabbing
+- Face detection 
+- Voice recognition and= direct response
+- Using ChatGPT APIs to import LLM
+- Face Recognizer and greeting
+- Magnetic charging
+- Local AI Model
+- Other features: display temperature, play music, etc.
+
