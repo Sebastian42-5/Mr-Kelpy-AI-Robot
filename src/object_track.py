@@ -2,7 +2,7 @@ import cv2
 import torch
 import os
 from ultralytics import YOLO
-from deepface import Deepface
+from deepface import DeepFace
 
 
 model = YOLO("yolov8n.pt")
