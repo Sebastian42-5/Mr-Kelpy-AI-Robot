@@ -32,7 +32,11 @@ while True:
                 engine.runAndWait()
             elif text.lower() == 'good and you':
                 engine.say('very good. Glad to be at your service!')
+            elif text.lower() == 'turn around':
+                engine.say('ok. Will do.')
+                send_message_to_arduino(text.lower())
 
             print(f"Text Recognized: {text}")
+
     except Exception as E:
         print(f"error: {E}")

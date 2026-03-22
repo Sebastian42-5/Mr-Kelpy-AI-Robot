@@ -1,0 +1,8 @@
+cv2
+torch
+ultralytics
+deepface
+pyaudio
+speech_recognition
+pyttsx3
+serial
