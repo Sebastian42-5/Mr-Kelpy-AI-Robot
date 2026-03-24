@@ -10,6 +10,7 @@ import webbrowser
 import serial
 import time
 import threading
+import ollama 
 
 
 recognizer = Recognizer()
@@ -22,6 +23,10 @@ def send_message_to_arduino(message):
     data = arduino.readline().decode('utf-8').strip()
     print(data)
 
+response = ollama.generate(
+    model="llama3.2",
+    prompt="What is the meaning of life?"
+)
 
 def speech_thread():
     while True:
@@ -37,7 +42,11 @@ def speech_thread():
                 elif text.lower() == 'primal time':
                     webbrowser.open('https://archive.org/details/primal-s-2-e-10/Primal+S1E2.mp4')
                 elif text.lower() == 'hello':
-                    engine.say('Hello how are you doing')
+                    response = ollama.generate(
+                    model="llama3.2",
+                    prompt="hello"
+                )
+                    engine.say(response.text)
                     engine.runAndWait()
                 elif text.lower() == 'good and you':
                     engine.say('very good. Glad to be at your service!')

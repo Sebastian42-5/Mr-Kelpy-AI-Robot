@@ -1,0 +1,16 @@
+Use fine tuning on an LLM with Ollama 
+
+I want to fine tune the model to have a memory on the prompts and adapt to the needs of the user 
+
+I have to create a JSON dataset 
+
+Use onsloth for fine tuning ?
+
+But how to dynamically fine tune the model by keeping the user prompts in memory? 
+
+use from sloth, from ollama, lang_chain 
+
+I would need a gyro sensor 
+
+
+

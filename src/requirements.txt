@@ -6,3 +6,4 @@ pyaudio
 speech_recognition
 pyttsx3
 serial
+ollama
