@@ -23,11 +23,6 @@ def send_message_to_arduino(message):
     data = arduino.readline().decode('utf-8').strip()
     print(data)
 
-response = ollama.generate(
-    model="llama3.2",
-    prompt="What is the meaning of life?"
-)
-
 def speech_thread():
     while True:
         try:
@@ -36,6 +31,13 @@ def speech_thread():
                 audio = recognizer.listen(mic)
 
                 text = recognizer.recognize_google(audio)
+
+                response = ollama.generate(
+                    model="llama3.2",
+                    prompt= text.lower()
+                )
+                engine.say(response.text)
+                engine.runAndWait()
 
                 if text.lower() == 'open youtube':
                     webbrowser.open('https://www.youtube.com/')
@@ -57,6 +59,8 @@ def speech_thread():
                     send_message_to_arduino(text.lower())
 
                 print(f"Text Recognized: {text}")
+
+                
 
         except Exception as E:
             print(f"error: {E}")
