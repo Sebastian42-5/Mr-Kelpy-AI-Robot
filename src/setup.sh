@@ -3,7 +3,7 @@
 VENV_DIR=".venv"
 
 echo "Creating virtual environment..."
-python3 -m venv "$VENV_DIR"
+python3.10 -m venv "$VENV_DIR"
 
 echo "Activating virtual environment..."
 source "$VENV_DIR/bin/activate"
