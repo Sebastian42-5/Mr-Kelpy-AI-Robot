@@ -7,13 +7,13 @@ import time
 
 recognizer = Recognizer()
 engine = pyttsx3.init()
-arduino = serial.Serial(port='COM4', baudrate=9600, timeout=0.1)
+# arduino = serial.Serial(port='COM4', baudrate=9600, timeout=0.1)
 
-def send_message_to_arduino(message):
-    arduino.write(bytes(message, 'utf-8'))
-    time.sleep(0.05)
-    data = arduino.readline().decode('utf-8').strip()
-    print(data)
+# def send_message_to_arduino(message):
+#     arduino.write(bytes(message, 'utf-8'))
+#     time.sleep(0.05)
+#     data = arduino.readline().decode('utf-8').strip()
+#     print(data)
 
 while True:
     try:
@@ -32,9 +32,9 @@ while True:
                 engine.runAndWait()
             elif text.lower() == 'good and you':
                 engine.say('very good. Glad to be at your service!')
-            elif text.lower() == 'turn around':
-                engine.say('ok. Will do.')
-                send_message_to_arduino(text.lower())
+            # elif text.lower() == 'turn around':
+            #     engine.say('ok. Will do.')
+            #     send_message_to_arduino(text.lower())
 
             print(f"Text Recognized: {text}")
 
