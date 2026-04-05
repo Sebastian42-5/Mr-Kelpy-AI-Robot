@@ -1,9 +1,10 @@
-import speech_recognition
+import speech_recognition as sr
 from speech_recognition import Recognizer
 import pyttsx3
 import webbrowser
 import serial
 import time
+import traceback
 
 recognizer = Recognizer()
 engine = pyttsx3.init()
@@ -15,28 +16,55 @@ engine = pyttsx3.init()
 #     data = arduino.readline().decode('utf-8').strip()
 #     print(data)
 
+recognizer = sr.Recognizer()
+engine = pyttsx3.init()
+
+def speak(text):
+    try:
+        engine.say(text)
+        engine.runAndWait()
+    except Exception as e:
+        print(f"TTS error: {e}")
+
+mic = sr.Microphone(device_index=2)
+
 while True:
     try:
-        with speech_recognition.Microphone() as mic:
-            recognizer.adjust_for_ambient_noise(mic, duration=0.2)
-            audio = recognizer.listen(mic)
+        print("🎤 Listening...")
 
-            text = recognizer.recognize_google(audio)
+        with mic as source:
+            recognizer.adjust_for_ambient_noise(source, duration=0.2)
+            audio = recognizer.listen(source, timeout=3, phrase_time_limit=5)
 
-            if text.lower() == 'open youtube':
-                webbrowser.open('https://www.youtube.com/')
-            elif text.lower() == 'primal time':
-                webbrowser.open('https://archive.org/details/primal-s-2-e-10/Primal+S1E2.mp4')
-            elif text.lower() == 'hello':
-                engine.say('Hello how are you doing')
-                engine.runAndWait()
-            elif text.lower() == 'good and you':
-                engine.say('very good. Glad to be at your service!')
-            # elif text.lower() == 'turn around':
-            #     engine.say('ok. Will do.')
-            #     send_message_to_arduino(text.lower())
+        print("🧠 Recognizing...")
+        text = recognizer.recognize_google(audio).lower()
 
-            print(f"Text Recognized: {text}")
+        print(f"✅ Heard: {text}")
 
-    except Exception as E:
-        print(f"error: {E}")
+        if "youtube" in text:
+            print("Opening YouTube")
+            webbrowser.open('https://www.youtube.com/')
+
+        elif "primal" in text:
+            print("Opening Primal")
+            webbrowser.open('https://archive.org/details/primal-s-2-e-10/Primal+S1E2.mp4')
+
+        elif "hello" in text:
+            speak("Hello how are you doing")
+
+        elif "good" in text:
+            speak("Very good. Glad to be at your service!")
+
+    except sr.WaitTimeoutError:
+        print("⏳ No speech detected")
+
+    except sr.UnknownValueError:
+        print("❓ Could not understand audio")
+
+    except sr.RequestError as e:
+        print(f"🌐 API error: {e}")
+
+    except Exception as e:
+        print(f"🔥 Unexpected error: {e}")
+
+    time.sleep(0.3)
