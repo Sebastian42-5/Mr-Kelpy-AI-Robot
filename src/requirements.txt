@@ -4,7 +4,7 @@ torch
 ultralytics
 deepface
 pyaudio
-speech_recognition
+SpeechRecognition
 pyttsx3
 serial
 ollama
