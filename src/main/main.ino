@@ -53,34 +53,7 @@ void setup() {
   pinMode(echoPin, INPUT);
   pinMode(touchSensor, INPUT_PULLUP);
 
-  // digitalWrite(in1, HIGH);
-  // digitalWrite(in2, LOW);
-  // digitalWrite(in3, HIGH);
-  // digitalWrite(in4, LOW);
-  // analogWrite(ena, 120);
-  // analogWrite(enb, 120);
-  // delay(2000);
-
-  // digitalWrite(in1, LOW);
-  // digitalWrite(in2, LOW);
-  // digitalWrite(in3, LOW);
-  // digitalWrite(in4, LOW);
-  // delay(2000);
-
-  // digitalWrite(in1, LOW);
-  // digitalWrite(in2, HIGH);
-  // digitalWrite(in3, LOW);
-  // digitalWrite(in4, HIGH);
-  // analogWrite(ena, 120);
-  // analogWrite(enb, 120);
-  // delay(2000);
-
-  // digitalWrite(in1, LOW);
-  // digitalWrite(in2, LOW);
-  // digitalWrite(in3, LOW);
-  // digitalWrite(in4, LOW);
-  // delay(2000);
-
+  
   if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)){
     Serial.println(F("Serial allocation failed"));
     for(;;);
@@ -90,9 +63,9 @@ void setup() {
     Serial.println("screen initialized");
   }
 
-  roboEyes.begin(&display, SCREEN_WIDTH, SCREEN_HEIGHT, 120);
+  roboEyes.begin(&display, SCREEN_WIDTH, SCREEN_HEIGHT, 60);
   roboEyes.open();
-  roboEyes.setAutoblinker(ON, 3, 2);
+  // roboEyes.setAutoblinker(ON, 3, 2);
   roboEyes.setIdleMode(ON, 2, 2);
   roboEyes.setWidth(80, 36);
   roboEyes.setHeight(28, 18);
@@ -103,12 +76,119 @@ void setup() {
 
 }
 
+void moveForward() {
+  digitalWrite(in1, LOW);
+  digitalWrite(in2, LOW);
+  digitalWrite(in3, LOW);
+  digitalWrite(in4, LOW);
+  analogWrite(ena, 0);
+  analogWrite(enb, 0);
+  delay(1000);
+
+  digitalWrite(in1, HIGH);
+  digitalWrite(in2, LOW);
+  digitalWrite(in3, HIGH);
+  digitalWrite(in4, LOW);
+  analogWrite(ena, 100);
+  analogWrite(enb, 100);
+  delay(1000);
+
+  digitalWrite(in1, LOW);
+  digitalWrite(in2, LOW);
+  digitalWrite(in3, LOW);
+  digitalWrite(in4, LOW);
+  delay(1000);
+}
+
+void moveBackward() {
+  digitalWrite(in1, LOW);
+  digitalWrite(in2, LOW);
+  digitalWrite(in3, LOW);
+  digitalWrite(in4, LOW);
+  analogWrite(ena, 0);
+  analogWrite(enb, 0);
+  delay(1000);
+
+  digitalWrite(in1, LOW);
+  digitalWrite(in2, HIGH);
+  digitalWrite(in3, LOW);
+  digitalWrite(in4, HIGH);
+  analogWrite(ena, 100);
+  analogWrite(enb, 100);
+  delay(1000);
+
+  digitalWrite(in1, LOW);
+  digitalWrite(in2, LOW);
+  digitalWrite(in3, LOW);
+  digitalWrite(in4, LOW);
+  delay(2000);
+}
+
+void turnRight() {
+  digitalWrite(in1, LOW);
+  digitalWrite(in2, LOW);
+  digitalWrite(in3, LOW);
+  digitalWrite(in4, LOW);
+  analogWrite(ena, 0);
+  analogWrite(enb, 0);
+  delay(1000);
+
+  digitalWrite(in1, LOW);
+  digitalWrite(in2, HIGH);
+  digitalWrite(in3, HIGH);
+  digitalWrite(in4, LOW);
+  analogWrite(ena, 100);
+  analogWrite(enb, 100);
+  delay(1000);
+
+  digitalWrite(in1, LOW);
+  digitalWrite(in2, LOW);
+  digitalWrite(in3, LOW);
+  digitalWrite(in4, LOW);
+  delay(2000);
+}
+
+void turnLeft() {
+   digitalWrite(in1, LOW);
+  digitalWrite(in2, LOW);
+  digitalWrite(in3, LOW);
+  digitalWrite(in4, LOW);
+  analogWrite(ena, 0);
+  analogWrite(enb, 0);
+  delay(1000);
+
+  digitalWrite(in1, HIGH);
+  digitalWrite(in2, LOW);
+  digitalWrite(in3, LOW);
+  digitalWrite(in4, HIGH);
+  analogWrite(ena, 100);
+  analogWrite(enb, 100);
+  delay(1000);
+
+  digitalWrite(in1, LOW);
+  digitalWrite(in2, LOW);
+  digitalWrite(in3, LOW);
+  digitalWrite(in4, LOW);
+  delay(2000);
+}
+
 void loop() {
-  // put your main code here, to run repeatedly:
-  // if(Serial.available()){
-  //   String data = Serial.readStringUntil("\n");
-  // }
+  put your main code here, to run repeatedly:
+  if(Serial.available()){
+    String data = Serial.readStringUntil("\n");
+    Serial.println("recieved.");
+
+    if(data == "move forward"){
+      moveForward();
+      delay(500);
+    } else if(data == "move backward"){
+      moveBackward();
+      delay(500);
+    }
+
+  }
   roboEyes.update();
+  roboEyes.setMood(DEFAULT);
   int touchDetected = digitalRead(touchSensor);
   // Serial.println(touchDetected);
 
@@ -132,7 +212,7 @@ void loop() {
       tail.write(pos);
       delay(20);
     }
-  }
+} 
 
 
 }

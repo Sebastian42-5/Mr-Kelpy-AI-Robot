@@ -8,13 +8,13 @@ import traceback
 
 recognizer = Recognizer()
 engine = pyttsx3.init()
-# arduino = serial.Serial(port='COM4', baudrate=9600, timeout=0.1)
+arduino = serial.Serial(port='COM4', baudrate=9600, timeout=0.1)
 
-# def send_message_to_arduino(message):
-#     arduino.write(bytes(message, 'utf-8'))
-#     time.sleep(0.05)
-#     data = arduino.readline().decode('utf-8').strip()
-#     print(data)
+def send_message_to_arduino(message):
+    arduino.write(bytes(message, 'utf-8'))
+    time.sleep(0.05)
+    data = arduino.readline().decode('utf-8').strip()
+    print(data)
 
 recognizer = sr.Recognizer()
 engine = pyttsx3.init()
@@ -54,6 +54,14 @@ while True:
 
         elif "good" in text:
             speak("Very good. Glad to be at your service!")
+
+        elif "forward" in text:
+            speak("Ok. Moving forward now.")
+            send_message_to_arduino("move forward")
+        elif "backward" in text:
+            speak("Ok. Moving backward now")
+            send_message_to_arduino("move backward")
+
 
     except sr.WaitTimeoutError:
         print("⏳ No speech detected")
