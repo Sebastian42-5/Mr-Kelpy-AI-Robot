@@ -1,7 +1,6 @@
 #include <Wire.h>
 #include <Servo.h>
 #include <Adafruit_SSD1306.h>
-#include <Adafruit_Sensor.h>
 #include <splash.h>
 #include <HCSR04.h>
 #include <FluxGarage_RoboEyes.h>
@@ -23,8 +22,6 @@ int touchSensor = 13;
 Servo tail;
 Servo claw; 
 
-roboEyes roboEyes;
-
 long duration;
 int distance;
 
@@ -32,10 +29,11 @@ int distance;
 #define SCREEN_HEIGHT 64
 #define OLED_RESET -1
 
+
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+RoboEyes<Adafruit_SSD1306> roboEyes(display);
 
 void setup() {
-  // put your setup code here, to run once:
 
   Serial.begin(9600);
 
@@ -63,7 +61,7 @@ void setup() {
     Serial.println("screen initialized");
   }
 
-  roboEyes.begin(&display, SCREEN_WIDTH, SCREEN_HEIGHT, 60);
+  roboEyes.begin(SCREEN_WIDTH, SCREEN_HEIGHT, 60);
   roboEyes.open();
   // roboEyes.setAutoblinker(ON, 3, 2);
   roboEyes.setIdleMode(ON, 2, 2);
@@ -89,8 +87,8 @@ void moveForward() {
   digitalWrite(in2, LOW);
   digitalWrite(in3, HIGH);
   digitalWrite(in4, LOW);
-  analogWrite(ena, 100);
-  analogWrite(enb, 100);
+  analogWrite(ena, 150);
+  analogWrite(enb, 150);
   delay(1000);
 
   digitalWrite(in1, LOW);
@@ -173,7 +171,6 @@ void turnLeft() {
 }
 
 void loop() {
-  put your main code here, to run repeatedly:
   if(Serial.available()){
     String data = Serial.readStringUntil("\n");
     Serial.println("recieved.");
@@ -188,7 +185,7 @@ void loop() {
 
   }
   roboEyes.update();
-  roboEyes.setMood(DEFAULT);
+  roboEyes.setMood(0);
   int touchDetected = digitalRead(touchSensor);
   // Serial.println(touchDetected);
 
