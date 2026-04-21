@@ -11,17 +11,28 @@ import serial
 import time
 import threading
 import ollama 
+import json 
 
 
 recognizer = Recognizer()
 
-# arduino = serial.Serial(port='COM4', baudrate=9600, timeout=0.1)
+arduino = serial.Serial(port='COM4', baudrate=9600, timeout=0.1)
 
-# def send_message_to_arduino(message):
-#     arduino.write(bytes(message, 'utf-8'))
-#     time.sleep(0.05)
-#     data = arduino.readline().decode('utf-8').strip()
-#     print(data)
+def send_message_to_arduino(message):
+    arduino.write(bytes(message, 'utf-8'))
+    time.sleep(0.05)
+    data = arduino.readline().decode('utf-8').strip()
+    print(data)
+
+def save_convo_to_json(user_input, response):
+    convo = {
+        "user_input": user_input,
+        "response": response,
+    }
+    with open("conversation_history.json", "a") as f:
+        json.dump(convo, f)
+        f.write("\n")
+        
 
 def speech_thread():
     engine = pyttsx3.init()

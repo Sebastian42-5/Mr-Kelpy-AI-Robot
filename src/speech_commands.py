@@ -30,16 +30,16 @@ mic = sr.Microphone(device_index=2)
 
 while True:
     try:
-        print("🎤 Listening...")
+        print("Listening...")
 
         with mic as source:
             recognizer.adjust_for_ambient_noise(source, duration=0.2)
             audio = recognizer.listen(source, timeout=3, phrase_time_limit=5)
 
-        print("🧠 Recognizing...")
+        print("Recognizing...")
         text = recognizer.recognize_google(audio).lower()
 
-        print(f"✅ Heard: {text}")
+        print(f"Heard: {text}")
 
         if "youtube" in text:
             print("Opening YouTube")
@@ -56,15 +56,15 @@ while True:
             speak("Very good. Glad to be at your service!")
 
     except sr.WaitTimeoutError:
-        print("⏳ No speech detected")
+        print("No speech detected")
 
     except sr.UnknownValueError:
-        print("❓ Could not understand audio")
+        print("Could not understand audio")
 
     except sr.RequestError as e:
-        print(f"🌐 API error: {e}")
+        print(f"API error: {e}")
 
     except Exception as e:
-        print(f"🔥 Unexpected error: {e}")
+        print(f"Unexpected error: {e}")
 
     time.sleep(0.3)
