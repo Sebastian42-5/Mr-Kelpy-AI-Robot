@@ -36,6 +36,16 @@ possible_labels = ["A photo of a screw", "A photo of a battery"]
 
 cache_path = "output_frames/embedding_cache.pkl"
 
+# boolean flags
+
+hunting_mode = False
+target_object = ""
+camera_thread_running = False
+face_detection_mode = False
+object_found = False
+
+
+state_lock = threading.Lock()
 
 cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 
@@ -45,6 +55,10 @@ if not os.path.exists('output_frames'):
 frame_count = 0
 frame_skip = 5
 image_count = 0
+
+# history of moves made
+
+moves_made = []
 
 
 def recognize_arduino_port():
@@ -116,6 +130,7 @@ def explore_mode():
     response = chat(model="llama3.2:latest", messages=messages)
     messages.append(response.message) # type: ignore
     direction = response.message.content[1:] # type: ignore
+    moves_made.append(direction)
     send_message_to_arduino(direction)
 
 
@@ -216,72 +231,85 @@ def find_best_match_in_database(live_frame_embedding, spoken_label=None):
 
 
 
-def object_tracking(model):
+def camera_loop(model):
+
+    global frame_count, hunting_mode, target_object
+
     os.makedirs(f'output_frames/objects', exist_ok=True)
     os.makedirs(f'output_frames/faces', exist_ok=True)
     
-    try:
-        while True:
-            timer = cv2.getTickCount()
-            fps = cap.get(cv2.CAP_PROP_FPS)
-            ret, frame = cap.read()
+    while camera_thread_running:
+        timer = cv2.getTickCount()
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        ret, frame = cap.read()
 
-            frame_count += 1
+        frame_count += 1
 
-            detected_faces = DeepFace.extract_faces(frame, detector_backend='opencv', enforce_detection=False)
+        detected_faces = DeepFace.extract_faces(frame, detector_backend='opencv', enforce_detection=False)
 
-            if len(detected_faces) > 0 and (frame_count % frame_skip == 0):
-                print(f"faces detected: {len(detected_faces)}")
-                for face_info in detected_faces:
-                    facial_area = face_info['facial_area'] # type: ignore
-                    x, y, w, h = face_info.get('x', 0), face_info.get('y', 0), face_info.get('w', 0), face_info.get('h', 0) # type: ignore
-                    cv2.rectangle(frame, (x, w), (y, h), (0, 0, 255), 2)
-                cv2.imwrite(f"output_frames/faces_frame_{frame_count}.jpg", frame)   
+        # face detection
 
-            if frame_count % frame_skip == 0:
-                image_dir = f"output_frames/object/frame_{frame_count}.jpg"
-                file_path = Path(image_dir)
-                cv2.imwrite(image_dir, frame)
-                live_frame_embedding, best_label = name_and_embed_saved_image(image_dir)
-               
+        if len(detected_faces) > 0 and (frame_count % frame_skip == 0):
+            print(f"faces detected: {len(detected_faces)}")
+            for face_info in detected_faces:
+                facial_area = face_info['facial_area'] # type: ignore
+                x, y, w, h = face_info.get('x', 0), face_info.get('y', 0), face_info.get('w', 0), face_info.get('h', 0) # type: ignore
+                cv2.rectangle(frame, (x, w), (y, h), (0, 0, 255), 2)
+            cv2.imwrite(f"output_frames/faces_frame_{frame_count}.jpg", frame)   
 
-            results = model(frame, stream=False)
+        if frame_count % frame_skip == 0:
+            image_dir = f"output_frames/object/frame_{frame_count}.jpg"
+            file_path = Path(image_dir)
+            cv2.imwrite(image_dir, frame)
+            live_embedding, detected_label = name_and_embed_saved_image(image_dir)
 
-            for r in results:
-                boxes = r.boxes.xyxy.cpu().numpy()
-                classes = r.boxes.cls.cpu().numpy()
-                confidences = r.boxes.conf.cpu().numpy()
+        if hunting_mode and target_object:
+            best_label, best_score = find_best_match_in_database(live_embedding, spoken_label=target_object)
 
-                for i in range(len(boxes)):
-                    x1, y1, x2, y2 = boxes[i]
-                    conf = confidences[i]
-                    cls = classes[i]
+            if best_score >= 0.85: # type: ignore
+                hunting_mode = False
+                speak(f"I found the {target_object}")
+                target_object = ""
 
-                    if conf > 0.5:
-                        class_name = model.names[cls]
-                        cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
-                        cv2.putText(frame, f"{class_name} {conf:.2f}", (int(x1), int(y1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2) 
-                        center_x = (x1 + x2) // 2
-                        center_y = (y1 + y2) // 2
-                        cv2.imshow("Object Detection", frame) 
-            x3, y3, x4, y4 = 100, 0, 300, 100
-            claw_center_x = (x3 + x4) // 2
-            claw_center_y = (y3 + y4) // 2
-            cv2.rectangle(frame, (x3, y3), (x4, y4), (255, 0, 0), 2)
+        
 
-            if cv2.waitKey(1) and 0xff == ord("q"):
-                break
-    finally:
-        cap.release()
-        cv2.destroyAllWindows()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        del model
+        results = model(frame, stream=False)
+
+        for r in results:
+            boxes = r.boxes.xyxy.cpu().numpy()
+            classes = r.boxes.cls.cpu().numpy()
+            confidences = r.boxes.conf.cpu().numpy()
+
+            for i in range(len(boxes)):
+                x1, y1, x2, y2 = boxes[i]
+                conf = confidences[i]
+                cls = classes[i]
+
+                if conf > 0.5:
+                    class_name = model.names[cls]
+                    cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                    cv2.putText(frame, f"{class_name} {conf:.2f}", (int(x1), int(y1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2) 
+                    center_x = (x1 + x2) // 2
+                    center_y = (y1 + y2) // 2
+                    cv2.imshow("Object Detection", frame) 
+        x3, y3, x4, y4 = 100, 0, 300, 100
+        claw_center_x = (x3 + x4) // 2
+        claw_center_y = (y3 + y4) // 2
+        cv2.rectangle(frame, (x3, y3), (x4, y4), (255, 0, 0), 2)
+
+        if cv2.waitKey(1) and 0xff == ord("q"):
+            break
+    cap.release()
+    cv2.destroyAllWindows()
+
 
 # Train the model (this might take time, consider if needed)
 # model.train(data="data.yaml", epochs=100, imgsz=640, batch=16, device=0)
 
-        
+cam_thread = threading.Thread(target=camera_loop)
+cam_thread.start()
+
+
 while True:
     try:
         print("🎤 Listening...")
@@ -320,9 +348,15 @@ while True:
             speak("Ok. It is my time to explore")
             explore_mode()
 
-        elif "object" in text:
-            speak("tracking object now")
-            object_tracking(model)
+        elif "find" in text:
+            speak("I got you")
+            with state_lock:
+                hunting_mode = True
+                hook = "find the"
+                detected_object = text.replace(hook, "")
+                target_object = detected_object
+            if hunting_mode:
+                explore_mode()
 
     except sr.WaitTimeoutError:
         print("No speech detected")
