@@ -13,13 +13,25 @@ import threading
 from ollama import chat
 import subprocess
 import pocketsphinx
+from pathlib import Path
+from PIL import Image
+import json
+import pickle
+
+# libraries to install
+
+from transformers import CLIPProcessor, CLIPModel
 
 
 recognizer = Recognizer()
 engine = pyttsx3.init()
 
+# load pretrained models
 
 model = YOLO("yolov8n.pt")
+embed_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+
 
 cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 
@@ -29,8 +41,6 @@ if not os.path.exists('output_frames'):
 frame_count = 0
 frame_skip = 5
 image_count = 0
-
-current_object = 'battery'
 
 
 def recognize_arduino_port():
@@ -105,10 +115,43 @@ def explore_mode():
     send_message_to_arduino(direction)
 
 
+# Automatically naming objects from images taken by the object_tracking model
+
+def name_and_embed_saved_image(image_path):
+
+    possible_labels = ["A photo of a screw", "A photo of a battery"]
+    pil_image = Image.open(image_path).convert("RGB")
+    text_inputs = processor(
+        text=possible_labels, 
+        images=pil_image, 
+        return_tensors="pt", 
+        padding=True
+    )
+
+    with torch.no_grad():
+        outputs = embed_model(**text_inputs)
+    
+def get_image_embedding(pil_image):
+    inputs = processor(images=pil_image, return_tensors="pt")
+    with torch.no_grad():
+        image_embedding = embed_model.get_image_features(**inputs)
+        image_embedding = image_embedding / image_embedding.norm(p=2, dim=-1, keepdim=True)
+
+def load_cache():
+    pass
+
+def save_cache():
+    pass
+
+def find_best_match_in_database():
+    pass
+
+
+# creating a logic to embed images as numerical vectors to optimize image database search
 
 
 def object_tracking(model):
-    os.makedirs(f'output_frames/{current_object}', exist_ok=True)
+    os.makedirs(f'output_frames/objects', exist_ok=True)
     os.makedirs(f'output_frames/faces', exist_ok=True)
     
     try:
@@ -127,11 +170,14 @@ def object_tracking(model):
                     facial_area = face_info['facial_area'] # type: ignore
                     x, y, w, h = face_info.get('x', 0), face_info.get('y', 0), face_info.get('w', 0), face_info.get('h', 0) # type: ignore
                     cv2.rectangle(frame, (x, w), (y, h), (0, 0, 255), 2)
-                cv2.imwrite(f"output_frames/faces_frame_{frame_count}.jpg", frame)
-
+                cv2.imwrite(f"output_frames/faces_frame_{frame_count}.jpg", frame)   
 
             if frame_count % frame_skip == 0:
-                cv2.imwrite(f"output_frames/{current_object}_frame_{frame_count}.jpg", frame)
+                image_dir = f"output_frames/object/frame_{frame_count}.jpg"
+                file_path = Path(image_dir)
+                cv2.imwrite(image_dir, frame)
+                object_name = name_saved_image(image_dir)
+                new_file_path = file_path.rename(f"output_frames/{object_name}/image_{frame_count}.jpg")
 
             results = model(frame, stream=False)
 
