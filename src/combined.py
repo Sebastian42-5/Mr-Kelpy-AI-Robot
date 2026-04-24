@@ -32,6 +32,10 @@ model = YOLO("yolov8n.pt")
 embed_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
 processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
+possible_labels = ["A photo of a screw", "A photo of a battery"]
+
+cache_path = "output_frames/embedding_cache.pkl"
+
 
 cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 
@@ -118,8 +122,6 @@ def explore_mode():
 # Automatically naming objects from images taken by the object_tracking model
 
 def name_and_embed_saved_image(image_path):
-
-    possible_labels = ["A photo of a screw", "A photo of a battery"]
     pil_image = Image.open(image_path).convert("RGB")
     text_inputs = processor(
         text=possible_labels, 
@@ -130,24 +132,88 @@ def name_and_embed_saved_image(image_path):
 
     with torch.no_grad():
         outputs = embed_model(**text_inputs)
+
+    logits = outputs.logits_per_image()
+    probs = logits.softmax(dim=-1).squeeze(0)
+    best_idx = probs.arg_max().item()
+    best_label = possible_labels[best_idx].replace("a photo of a", "")
+    best_confidence = probs[best_idx].item()
+
+    print(f"detected {best_label} with a {best_confidence} confidence")
+
+    # saving the image into the correct folder
+    
+    label_folder = f"output_frames/{best_label}"
+    os.makedirs(label_folder)
+    new_label = os.path.basename(image_path)
+    new_image_path = os.path.join(label_folder, new_label)
+    pil_image.save(image_path)
+
+    # cache the embedding of the image
+
+    embedding = get_image_embedding(pil_image)
+    
+    cache = load_cache()
+    cache.append({
+        "label": best_label,
+        "image_path": new_image_path,
+        "embedding": embedding,
+        "confidence": best_confidence
+    })
+
+    save_cache(cache)
+
+    print(f"Saved to {new_image_path} with a total of {len(cache)} total entries")
+
+    return embedding, best_label
+
+
     
 def get_image_embedding(pil_image):
     inputs = processor(images=pil_image, return_tensors="pt")
     with torch.no_grad():
         image_embedding = embed_model.get_image_features(**inputs)
         image_embedding = image_embedding / image_embedding.norm(p=2, dim=-1, keepdim=True)
+    return image_embedding.squeeze(0)
 
 def load_cache():
-    pass
+    if os.path.exists(cache_path):
+        with open(cache_path, "rb") as f:
+            pickle.load(f)
+    return []
 
-def save_cache():
-    pass
+def save_cache(cache):
+    with open(cache_path, "wb") as f:
+        pickle.dump(cache, f)
 
-def find_best_match_in_database():
-    pass
+def find_best_match_in_database(live_frame_embedding, spoken_label=None):
+    cache = load_cache()
+
+    if not cache:
+        print("Database is empty, keep exploring!")
+        return None, 0.0
+
+    best_score = -1
+    best_label = "" 
+
+    for entry in cache:
+        if spoken_label and spoken_label.lower() not in entry["label"]:
+            continue
+
+        cached_embedding = entry["embedding"]
+        score = torch.dot(live_frame_embedding, cached_embedding).item()
+
+        if score > best_score:
+            best_score = entry["confidence"]
+            best_label = entry["label"]
+
+    print(f"best match is: {best_label}, with a {best_score} similarity")
+    return best_score, best_label
+
 
 
 # creating a logic to embed images as numerical vectors to optimize image database search
+
 
 
 def object_tracking(model):
@@ -225,10 +291,10 @@ while True:
             recognizer.adjust_for_ambient_noise(source, duration=0.2)
             audio = recognizer.listen(source, timeout=3, phrase_time_limit=5)
 
-        print("🧠 Recognizing...")
+        print("Recognizing...")
         text = recognizer.recognize_sphinx(audio).lower()
 
-        print(f"✅ Heard: {text}")
+        print(f"Heard: {text}")
 
         if "youtube" in text:
             print("Opening YouTube")
@@ -260,16 +326,16 @@ while True:
             object_tracking(model)
 
     except sr.WaitTimeoutError:
-        print("⏳ No speech detected")
+        print("No speech detected")
 
     except sr.UnknownValueError:
-        print("❓ Could not understand audio")
+        print("Could not understand audio")
 
     except sr.RequestError as e:
-        print(f"🌐 API error: {e}")
+        print(f"API error: {e}")
 
     except Exception as e:
-        print(f"🔥 Unexpected error: {e}")
+        print(f"Unexpected error: {e}")
 
     time.sleep(0.3)
 
