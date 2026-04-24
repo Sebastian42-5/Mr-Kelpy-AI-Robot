@@ -242,8 +242,8 @@ def object_tracking(model):
                 image_dir = f"output_frames/object/frame_{frame_count}.jpg"
                 file_path = Path(image_dir)
                 cv2.imwrite(image_dir, frame)
-                object_name = name_saved_image(image_dir)
-                new_file_path = file_path.rename(f"output_frames/{object_name}/image_{frame_count}.jpg")
+                live_frame_embedding, best_label = name_and_embed_saved_image(image_dir)
+               
 
             results = model(frame, stream=False)
 
@@ -268,7 +268,6 @@ def object_tracking(model):
             claw_center_x = (x3 + x4) // 2
             claw_center_y = (y3 + y4) // 2
             cv2.rectangle(frame, (x3, y3), (x4, y4), (255, 0, 0), 2)
-
 
             if cv2.waitKey(1) and 0xff == ord("q"):
                 break
