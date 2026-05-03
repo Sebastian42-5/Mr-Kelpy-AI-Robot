@@ -50,8 +50,23 @@ class GIFPlayer:
             next_delay = self.frame_delay
             self.counter += 1
 
-        self.root.after(next_delay, self.play_gif)
+        self.cancel_id = self.root.after(next_delay, self.play_gif)
 
+    def stop_gif(self):
+        if self.cancel_id:
+            self.root.after_cancel(self.cancel_id)
+            self.cancel_id = None
+
+    def switch_gif(self, new_path, frame_delay, loop_delay):
+        self.stop_gif()
+
+        self.counter = 0
+        self.img = Image.open(new_path)
+        self.frames = [ImageTk.PhotoImage(frame.copy().convert('RGBA')) for frame in ImageSequence.Iterator(self.img)]
+        self.frame_delay = frame_delay
+        self.loop_delay = loop_delay
+        
+        self.play_gif()
 
 root = tk.Tk()
 root.attributes('-fullscreen', True)
