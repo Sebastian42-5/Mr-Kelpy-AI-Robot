@@ -28,7 +28,7 @@ from transformers import CLIPProcessor, CLIPModel
 # classes created
 
 from eye_animation import GIFPlayer
-from face_greeting import load_db, get_similarity_score
+from face_greeting import load_db, get_similarity_score, associate_name_with_face
 
 recognizer = Recognizer()
 engine = pyttsx3.init()
@@ -59,7 +59,7 @@ state_lock = threading.Lock()
 
 # global variables for face detecting loop
 
-current_face_embedding = None
+latest_face_embedding = None
 pending_greeding = None
 people_greeted_this_session = set()
 face_state_lock = threading.Lock()
@@ -396,11 +396,29 @@ while True:
             if hunting_mode:
                 explore_mode()
         
-        elif "I am" in text:
+        elif "i am" in text:
             name = text[4:]
             speak(f"nice to meet you {name}")
-            if name not in name_db:
-                name_db.append(name)
+
+            if not name:
+                speak("Sorry, I did not get that. Could you say it again?")
+            else:
+                with face_state_lock:
+                    current_face_embedding = latest_face_embedding
+                
+                if current_face_embedding is None:
+                    speak("Sorry, I cannot see your face right now.")
+
+                    successful_naming = associate_name_with_face(current_face_embedding, name)
+
+                    if successful_naming:
+                        player.switch_gif('happy.gif', 67, 500)
+                        speak(f"nice to meet you {name}. I will remember you from now on!")
+                        player.switch_gif('idle-animation.gif', 67, 500)
+                    else:
+                        speak("I could not recognize you, since your face does not match my memory. Please try doing a different pose")
+
+            
 
     except sr.WaitTimeoutError:
         print("No speech detected")
