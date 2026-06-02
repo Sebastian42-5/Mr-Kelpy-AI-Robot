@@ -12,12 +12,12 @@ int tailPin = 4;
 int ena = 5; 
 int in1 = 6;
 int in2 = 7;
-int in3 = 8;
-int in4 = 9;
+int in3 = 12;
+int in4 = 13;
 int enb = 10;
-int echoPin = 11;
-int trigPin = 12;
-int touchSensor = 13; 
+int echoPin = 9;
+int trigPin = 8;
+int touchSensor = 11; 
 
 Servo tail;
 Servo claw; 
@@ -74,27 +74,27 @@ void setup() {
 
   // this is just for a small test
 
-  // digitalWrite(in1, LOW);
-  // digitalWrite(in2, LOW);
-  // digitalWrite(in3, LOW);
-  // digitalWrite(in4, LOW);
-  // analogWrite(ena, 0);
-  // analogWrite(enb, 0);
-  // delay(1000);
+  digitalWrite(in1, LOW);
+  digitalWrite(in2, LOW);
+  digitalWrite(in3, LOW);
+  digitalWrite(in4, LOW);
+  analogWrite(ena, 0);
+  analogWrite(enb, 0);
+  delay(1000);
 
-  // digitalWrite(in1, HIGH);
-  // digitalWrite(in2, LOW);
-  // digitalWrite(in3, HIGH);
-  // digitalWrite(in4, LOW);
-  // analogWrite(ena, 150);
-  // analogWrite(enb, 150);
-  // delay(1000);
+  digitalWrite(in1, HIGH);
+  digitalWrite(in2, LOW);
+  digitalWrite(in3, HIGH);
+  digitalWrite(in4, LOW);
+  analogWrite(ena, 350);
+  analogWrite(enb, 150);
+  delay(1000);
 
-  // digitalWrite(in1, LOW);
-  // digitalWrite(in2, LOW);
-  // digitalWrite(in3, LOW);
-  // digitalWrite(in4, LOW);
-  // delay(1000);
+  digitalWrite(in1, LOW);
+  digitalWrite(in2, LOW);
+  digitalWrite(in3, LOW);
+  digitalWrite(in4, LOW);
+  delay(1000);
 
 }
 
