@@ -19,6 +19,7 @@ from PIL import Image
 import json
 import pickle
 import tkinter as tk
+from skimage.metrics import structural_similarity as ssim
 
 # libraries to install
 
@@ -27,6 +28,7 @@ from transformers import CLIPProcessor, CLIPModel
 # classes created
 
 from eye_animation import GIFPlayer
+from face_greeting import load_db, get_similarity_score
 
 recognizer = Recognizer()
 engine = pyttsx3.init()
@@ -41,6 +43,8 @@ possible_labels = ["A photo of a screw", "A photo of a battery"]
 
 cache_path = "output_frames/embedding_cache.pkl"
 
+name_db = {}
+
 # boolean flags
 
 hunting_mode = False
@@ -51,6 +55,15 @@ object_found = False
 
 
 state_lock = threading.Lock()
+
+
+# global variables for face detecting loop
+
+current_face_embedding = None
+pending_greeding = None
+people_greeted_this_session = set()
+face_state_lock = threading.Lock()
+
 
 cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 
@@ -231,7 +244,6 @@ def find_best_match_in_database(live_frame_embedding, spoken_label=None):
     return best_score, best_label
 
 
-
 # creating a logic to embed images as numerical vectors to optimize image database search
 
 
@@ -260,7 +272,8 @@ def camera_loop(model):
                 facial_area = face_info['facial_area'] # type: ignore
                 x, y, w, h = face_info.get('x', 0), face_info.get('y', 0), face_info.get('w', 0), face_info.get('h', 0) # type: ignore
                 cv2.rectangle(frame, (x, w), (y, h), (0, 0, 255), 2)
-            cv2.imwrite(f"output_frames/faces_frame_{frame_count}.jpg", frame)   
+            cv2.imwrite(f"output_frames/faces_frame_{frame_count}.jpg", frame) 
+
 
         if frame_count % frame_skip == 0:
             image_dir = f"output_frames/object/frame_{frame_count}.jpg"
@@ -386,6 +399,8 @@ while True:
         elif "I am" in text:
             name = text[4:]
             speak(f"nice to meet you {name}")
+            if name not in name_db:
+                name_db.append(name)
 
     except sr.WaitTimeoutError:
         print("No speech detected")
