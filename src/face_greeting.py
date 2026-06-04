@@ -2,35 +2,109 @@ import os
 import pickle
 import cv2
 from skimage.metrics import structural_similarity as ssim
+import numpy as np
 from deepface import DeepFace
 
 FACE_DB_PATH = 'face_memory/face_db.pkl'
 FACE_IMAGES_DIR = 'face_memory/face_images'
+
+CLUSTER_ASSOCIATION_THRESHOLD = 0.55
+NAME_SIMILARITY_THRESHOLD = 0.60
+MIN_CLUSTER_REQUIRED_TO_NAME = 3
+
+only_named = True
+
+""" 
+Each cluster has an id, a centroid, it's size, embeddings and image paths
+
+"""
 
 def load_db(db_path=FACE_DB_PATH):
     if os.path.exists(db_path):
         with open(db_path, 'rb') as f:
             return pickle.load(f)
     else:
-        return {}
+        return {'clusters': []}
     
-def save_db():
-    pass
+def save_db(face_db):
+    with open(FACE_DB_PATH, "f") as file:
+        pickle.dump(face_db, file)
 
-def get_face_embedding():
-    pass
+def get_face_embedding(face_bgr_cut):
+    """
+    Returns L2 normalized vector face embedding using deepface
+    """
+    try:
+        result = DeepFace.represent(
+        img_path=face_bgr_cut,
+        model_name="Facenet512",
+        detector_backend="skip",   
+        enforce_detection=False,
+    )
+        vec = np.array(result[0]["embedding"], dtype=np.float32)
 
-def cosine_similarity():
-    pass
+        norm = np.linalg.norm(vec)
 
-def update_cluster_centroid():
-    pass
+        if norm == 0:
+            return None
+        else:
+            return vec / norm
+    except Exception as e:
+        return None
 
-def find_most_accurate_cluster():
-    pass
+def cosine_similarity(veca, vecb):
+    return float(np.dot(veca, vecb))
 
-def process_face():
-    pass
+def update_cluster_centroid(cluster):
+    centroid = np.mean(cluster)
+    norm = np.linalg.norm(centroid)
+    if norm == 0:
+        return centroid
+    return centroid / norm
+
+def find_most_accurate_cluster(db, current_embed, only_named):
+    best_index = 0 
+    best_similarity = 0 
+
+    if only_named:
+        threshold = NAME_SIMILARITY_THRESHOLD
+    else:
+        threshold = CLUSTER_ASSOCIATION_THRESHOLD
+
+    for i, centroid in enumerate(db):
+        if only_named and db["name"] is None:
+            continue
+        similarity = cosine_similarity(centroid, current_embed)
+        if similarity > best_similarity:
+            best_index = i 
+            best_similarity = similarity 
+    
+    if best_index is not None and best_similarity >= threshold:
+        return best_index, best_similarity
+    else:
+        return 0.0, None
+               
+
+def process_face(face_crop_bgr, frame_index):
+    current_embed = get_face_embedding(face_crop_bgr)
+
+    if current_embed is None:
+        return None
+
+    db = load_db(FACE_DB_PATH)
+    best_index, best_similarity = find_most_accurate_cluster(db, current_embed, only_named)
+
+    if best_index is not None:
+        cluster_id = db["clusters"][best_index]["id"]
+    # it's a new cluster
+    else:
+        cluster_id = len(db["clusters"])
+
+    if best_index is not None:
+        
+
+
+
 
 def save_face_to_db():
     pass
