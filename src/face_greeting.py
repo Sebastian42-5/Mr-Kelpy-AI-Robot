@@ -15,7 +15,7 @@ MIN_CLUSTER_REQUIRED_TO_NAME = 3
 only_named = True
 
 """ 
-Each cluster has an id, a centroid, it's size, embeddings and image paths
+Each cluster has an id, a centroid, embeddings and image paths
 
 """
 
@@ -99,9 +99,26 @@ def process_face(face_crop_bgr, frame_index):
     # it's a new cluster
     else:
         cluster_id = len(db["clusters"])
+    
+    img_filename = f"face_memory/images/cluster{cluster_id}_frame{frame_index}.jpg"
+    cv2.imwrite(img_filename, face_crop_bgr)
 
-    if best_index is not None:
-        
+    if best_index is not None: # if the embedding is already on the db
+        cluster = db["clusters"][cluster_id]
+        cluster["embeddings"].append(current_embed)
+        cluster["image_paths"].append(img_filename)
+        update_cluster_centroid(cluster)
+        print(f"the size of cluster {cluster_id} is now {len(cluster["embeddings"])}")
+    else:
+        new_cluster = {
+            "id": cluster_id,  
+            "name": None,
+            "embeddings": [current_embed],
+            "image_paths": [img_filename],
+            "centroid": None,
+        }
+        db["clusters"].append(new_cluster)
+    
 
 
 
