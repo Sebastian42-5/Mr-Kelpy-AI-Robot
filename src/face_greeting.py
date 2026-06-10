@@ -116,15 +116,12 @@ def process_face(face_crop_bgr, frame_index):
             "embeddings": [current_embed],
             "image_paths": [img_filename],
             "centroid": None,
+
         }
         db["clusters"].append(new_cluster)
-    
+    save_db(db)
+    return cluster
 
-
-
-
-def save_face_to_db():
-    pass
 
 def get_similarity_score(img1_path, img2_path):
     img1 = cv2.imread(img1_path)
@@ -136,7 +133,30 @@ def get_similarity_score(img1_path, img2_path):
     score, _ = ssim(img1_gray, img2_gray, full=True)
     return score
 
-def associate_name_with_face():
+def associate_name_with_face(current_embed, name):
+    db = load_db(FACE_DB_PATH)
+
+    best_index = -1
+    best_similarity = 0
+
+    if current_embed not in db["clusters"]:
+        return False
+    
+    for i, cluster in enumerate(db["clusters"]):
+        similarity_index = cosine_similarity(db["clusters"][i], cluster)
+
+        if similarity_index > best_similarity:
+            best_index = i 
+            best_similarity = similarity_index
+        
+        if similarity_index > CLUSTER_ASSOCIATION_THRESHOLD:
+            db["clusters"]["name"] = name
+        
+        save_db(db)
+
+
+
+
     pass
 
 def recognize_face():
