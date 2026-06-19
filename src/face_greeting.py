@@ -149,18 +149,39 @@ def associate_name_with_face(current_embed, name):
             best_index = i 
             best_similarity = similarity_index
         
-        if similarity_index > CLUSTER_ASSOCIATION_THRESHOLD:
-            db["clusters"]["name"] = name
-        
-        save_db(db)
+    if best_index is None or best_similarity < CLUSTER_ASSOCIATION_THRESHOLD:
+        print("No name matches with this cluster")
+        return False
+    
+    db["clusters"][best_index]["name"] = name
+    
+    save_db(db)
+    return True
 
 
 
+def recognize_face(current_embed):
+    db = load_db(FACE_DB_PATH)
 
-    pass
+    best_index, best_similarity = find_most_accurate_cluster(db, current_embed, only_named=True)
+    
+    if best_index is not None:
+        name = db["clusters"][best_index]["name"]
+        print(f"The name associated to that face is {name} with a similarity of {best_similarity:.3f}")
+        return name
+    return None
 
-def recognize_face():
-    pass
 
-def get_most_recently_added_face_embedding():
-    pass
+def get_most_recently_added_face_embedding(db_snapshot):
+    db = db_snapshot or load_db(FACE_DB_PATH)
+    recently_grown_cluster = None 
+
+    for cluster in db["clusters"]:
+        if recently_grown_cluster is None:
+            recently_grown_cluster = cluster 
+        elif len(cluster["embeddings"]) >= len(recently_grown_cluster["embeddings"]):
+            recently_grown_cluster = cluster
+    
+    if recently_grown_cluster:
+        return recently_grown_cluster["embedding"][-1]
+    return None

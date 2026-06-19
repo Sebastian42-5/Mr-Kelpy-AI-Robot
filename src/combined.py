@@ -28,7 +28,7 @@ from transformers import CLIPProcessor, CLIPModel
 # classes created
 
 from eye_animation import GIFPlayer
-from face_greeting import load_db, get_similarity_score, associate_name_with_face
+from face_greeting import load_db, get_face_embedding, get_similarity_score, associate_name_with_face, recognize_face
 
 recognizer = Recognizer()
 engine = pyttsx3.init()
@@ -251,9 +251,12 @@ def find_best_match_in_database(live_frame_embedding, spoken_label=None):
 def camera_loop(model):
 
     global frame_count, hunting_mode, target_object
+    global latest_face_embedding, pending_greeding
 
     os.makedirs(f'output_frames/objects', exist_ok=True)
     os.makedirs(f'output_frames/faces', exist_ok=True)
+
+    live_embedding = None
     
     while camera_thread_running:
         timer = cv2.getTickCount()
@@ -272,6 +275,8 @@ def camera_loop(model):
                 facial_area = face_info['facial_area'] # type: ignore
                 x, y, w, h = face_info.get('x', 0), face_info.get('y', 0), face_info.get('w', 0), face_info.get('h', 0) # type: ignore
                 cv2.rectangle(frame, (x, w), (y, h), (0, 0, 255), 2)
+
+                face_crop = facial_area[y: y + h, x: x + w]
             cv2.imwrite(f"output_frames/faces_frame_{frame_count}.jpg", frame) 
 
 
