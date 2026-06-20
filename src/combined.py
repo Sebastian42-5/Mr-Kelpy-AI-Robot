@@ -7,8 +7,8 @@ import speech_recognition as sr
 from speech_recognition import Recognizer
 import pyttsx3
 import webbrowser
-from serial import tools
 import serial
+from serial.tools import list_ports
 import time
 import threading
 from ollama import chat
@@ -28,7 +28,7 @@ from transformers import CLIPProcessor, CLIPModel
 # classes created
 
 from eye_animation import GIFPlayer
-from face_greeting import load_db, get_face_embedding, get_similarity_score, associate_name_with_face, recognize_face
+from face_greeting import load_db, get_face_embedding, get_similarity_score, associate_name_with_face, process_face, recognize_face
 
 recognizer = Recognizer()
 engine = pyttsx3.init()
@@ -42,6 +42,8 @@ processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 possible_labels = ["A photo of a screw", "A photo of a battery"]
 
 cache_path = "output_frames/embedding_cache.pkl"
+face_db_path = 'face_memory/face_db.pkl'
+face_images_dir = 'face_memory/face_images'
 
 name_db = {}
 
@@ -60,7 +62,7 @@ state_lock = threading.Lock()
 # global variables for face detecting loop
 
 latest_face_embedding = None
-pending_greeding = None
+pending_greeting = None
 people_greeted_this_session = set()
 face_state_lock = threading.Lock()
 
@@ -251,7 +253,7 @@ def find_best_match_in_database(live_frame_embedding, spoken_label=None):
 def camera_loop(model):
 
     global frame_count, hunting_mode, target_object
-    global latest_face_embedding, pending_greeding
+    global latest_face_embedding, pending_greeting
 
     os.makedirs(f'output_frames/objects', exist_ok=True)
     os.makedirs(f'output_frames/faces', exist_ok=True)
@@ -277,6 +279,24 @@ def camera_loop(model):
                 cv2.rectangle(frame, (x, w), (y, h), (0, 0, 255), 2)
 
                 face_crop = facial_area[y: y + h, x: x + w]
+
+                if face_crop.size == 0:
+                    return None
+                cluster = process_face(face_crop, frame)
+                if cluster is not None:
+                    current_embed = cluster["embeddings"][-1]
+                with state_lock:
+                    latest_face_embedding = current_embed
+
+                matching_name = recognize_face(current_embed)
+
+                if matching_name:
+                    with state_lock:
+                        if matching_name not in people_greeted_this_session:
+                            pending_greeting = matching_name 
+                            people_greeted_this_session.add(name)
+            
+
             cv2.imwrite(f"output_frames/faces_frame_{frame_count}.jpg", frame) 
 
 
@@ -294,7 +314,6 @@ def camera_loop(model):
                 speak(f"I found the {target_object}")
                 target_object = ""
 
-        
 
         results = model(frame, stream=False)
 
@@ -314,7 +333,9 @@ def camera_loop(model):
                     cv2.putText(frame, f"{class_name} {conf:.2f}", (int(x1), int(y1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2) 
                     center_x = (x1 + x2) // 2
                     center_y = (y1 + y2) // 2
-                    cv2.imshow("Object Detection", frame) 
+                    cv2.imshow("Object Detection", frame)
+
+
         x3, y3, x4, y4 = 100, 0, 300, 100
         claw_center_x = (x3 + x4) // 2
         claw_center_y = (y3 + y4) // 2
@@ -329,7 +350,8 @@ def camera_loop(model):
 # Train the model (this might take time, consider if needed)
 # model.train(data="data.yaml", epochs=100, imgsz=640, batch=16, device=0)
 
-cam_thread = threading.Thread(target=camera_loop)
+cam_thread_running = True
+cam_thread = threading.Thread(target=camera_loop, args=(model,), daemon=True)
 cam_thread.start()
 
 
@@ -341,6 +363,11 @@ while True:
         root.mainloop()
 
         print("Listening...")
+
+        with face_state_lock:
+            greeding_name = pending_greeting
+            pending_greeting = None
+
 
         with sr.Microphone() as source:
             recognizer.adjust_for_ambient_noise(source, duration=0.2)
@@ -402,7 +429,7 @@ while True:
                 explore_mode()
         
         elif "i am" in text:
-            name = text[4:]
+            name = text.split("i am", 1)[-1].strip()
             speak(f"nice to meet you {name}")
 
             if not name:
@@ -413,7 +440,7 @@ while True:
                 
                 if current_face_embedding is None:
                     speak("Sorry, I cannot see your face right now.")
-
+                else:
                     successful_naming = associate_name_with_face(current_face_embedding, name)
 
                     if successful_naming:
