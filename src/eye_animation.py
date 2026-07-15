@@ -2,13 +2,15 @@ from PIL import Image, ImageTk, ImageSequence
 from pathlib import Path
 import tkinter as tk
 
-root_dir = Path('animation_frames/idle')
+root_dir = Path('src/animation_frames/idle')
 
 idle_image_frame_paths = []
 
 for path in root_dir.rglob('*'):
     if path.is_file() and 'idle' in path.name:
         idle_image_frame_paths.append(path)
+        idle_image_frame_paths.sort()
+
 
 frames = [Image.open(path) for path in idle_image_frame_paths]
 
@@ -68,7 +70,8 @@ class GIFPlayer:
         
         self.play_gif()
 
-root = tk.Tk()
-root.attributes('-fullscreen', True)
-player = GIFPlayer(root, 'idle-animation.gif', 67, 500)
-root.mainloop()
+if __name__ == "__main__":
+    root = tk.Tk()
+    root.attributes('-fullscreen', True)
+    player = GIFPlayer(root, 'idle-animation.gif', 67, 500)
+    root.mainloop()

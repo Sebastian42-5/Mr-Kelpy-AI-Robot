@@ -19,6 +19,7 @@ from PIL import Image
 import json
 import pickle
 import tkinter as tk
+import keyboard
 from skimage.metrics import structural_similarity as ssim
 
 # libraries to install
@@ -80,6 +81,11 @@ image_count = 0
 
 moves_made = []
 
+# tk animation 
+
+animation_player = None
+root = None 
+
 
 def recognize_arduino_port():
     ports = list(serial.tools.list_ports.comports())
@@ -93,15 +99,15 @@ def recognize_arduino_port():
         print(f"{p.device} - {p.description}")
     return None
 
-arduino_port = recognize_arduino_port()
+# arduino_port = recognize_arduino_port()
     
-arduino = serial.Serial(port="/dev/ttyACM0", baudrate=9600, timeout=0.1)
+# arduino = serial.Serial(port="/dev/ttyACM0", baudrate=9600, timeout=0.1)
 
-def send_message_to_arduino(message):
-    arduino.write(bytes(message, 'utf-8'))
-    time.sleep(0.05)
-    data = arduino.readline().decode('utf-8').strip()
-    print(data)
+# def send_message_to_arduino(message):
+#     arduino.write(bytes(message, 'utf-8'))
+#     time.sleep(0.05)
+#     data = arduino.readline().decode('utf-8').strip()
+#     print(data)
 
 def save_convo_to_json(user_input, response):
     convo = {
@@ -119,39 +125,39 @@ engine = pyttsx3.init()
 def speak(text):
     subprocess.run(["espeak", text])
 
-def explore_mode():
-    detected_walls = {}
-    data = arduino.readline().decode('utf-8').strip()
-    if data.startswith("distance"):
-        distance = data
+# def explore_mode():
+#     detected_walls = {}
+#     data = arduino.readline().decode('utf-8').strip()
+#     if data.startswith("distance"):
+#         distance = data
     
-    is_over = False
+#     is_over = False
 
-    prompt = f"""
+#     prompt = f"""
 
-    You are a robot navigating in a room 
+#     You are a robot navigating in a room 
 
-    Look at your previous action, unless it is the first action you do.
-    The distance from an obstacle is {distance}
+#     Look at your previous action, unless it is the first action you do.
+#     The distance from an obstacle is {distance}
 
-    what should you do? 
-    Respond by either: forward, backward, left, or right
+#     what should you do? 
+#     Respond by either: forward, backward, left, or right
 
-    save your actions with an index, so it would be: 1forward, 2left, 3right, etc. 
-    """
+#     save your actions with an index, so it would be: 1forward, 2left, 3right, etc. 
+#     """
 
-    messages = [
-        {
-            "role":"user",
-            "content": prompt
-        },
-    ]
+#     messages = [
+#         {
+#             "role":"user",
+#             "content": prompt
+#         },
+#     ]
 
-    response = chat(model="llama3.2:latest", messages=messages)
-    messages.append(response.message) # type: ignore
-    direction = response.message.content[1:] # type: ignore
-    moves_made.append(direction)
-    send_message_to_arduino(direction)
+#     response = chat(model="llama3.2:latest", messages=messages)
+#     messages.append(response.message) # type: ignore
+#     direction = response.message.content[1:] # type: ignore
+#     moves_made.append(direction)
+#     send_message_to_arduino(direction)
 
 
 # Automatically naming objects from images taken by the object_tracking model
@@ -354,13 +360,27 @@ cam_thread_running = True
 cam_thread = threading.Thread(target=camera_loop, args=(model,), daemon=True)
 cam_thread.start()
 
+def run_tk():
+    global root, player
+    root = tk.Tk()
+    root.attributes('-fullscreen', True)
+    player = GIFPlayer(root, 'idle-animation.gif', 67, 500)
+    root.mainloop()
+
+def switch_animation(gif_name, frame_delay=67, loop_delay=500):
+   root.after(0, lambda: player.switch_gif(gif_name, frame_delay, loop_delay))
+
+
+tk_thread_running = True
+tk_thread = threading.Thread(target=run_tk, daemon=True)
+tk_thread.start()
+
 
 while True:
     try:
-        root = tk.Tk()
-        root.attributes('-fullscreen', True)
-        player = GIFPlayer(root, 'idle-animation.gif', 67, 500)
-        root.mainloop()
+
+        if keyboard.is_pressed('q'):
+            break
 
         print("Listening...")
 
@@ -378,7 +398,7 @@ while True:
 
         # robot switches to thinking mode
 
-        player.switch_gif('thinking.gif', 67, 500)
+        switch_animation('thinking.gif', 67, 500)
 
         print(f"Heard: {text}")
 
@@ -391,32 +411,38 @@ while True:
             webbrowser.open('https://archive.org/details/primal-s-2-e-10/Primal+S1E2.mp4')
 
         elif "hello" in text:
-            player.switch_gif('happy.gif', 67, 500)
+            switch_animation('happy.gif', 67, 500)
             speak("Hello how are you doing")
-            player.switch_gif('idle-animation.gif', 67, 500)
+            time.sleep(0.5)
+            switch_animation('idle-animation.gif', 67, 500)
+           
 
         elif "good" in text:
-            player.switch_gif('talking.gif', 67, 500)
+            switch_animation('talking.gif', 67, 500)
             speak("Very good. Glad to be at your service!")
-            player.switch_gif('idle-animation.gif', 67, 500)
+            time.sleep(0.5)
+            switch_animation('idle-animation.gif', 67, 500)
 
         elif "forward" in text:
-            player.switch_gif('talking.gif', 67, 500)
+            switch_animation('talking.gif', 67, 500)
             speak("Ok. Moving forward now.")
-            player.switch_gif('idle-animation.gif', 67, 500)
-            send_message_to_arduino("move forward")
+            time.sleep(0.5)
+            switch_animation('idle-animation.gif', 67, 500)
+            # send_message_to_arduino("move forward")
 
         elif "backward" in text:
-            player.switch_gif('talking.gif', 67, 500)
+            switch_animation('talking.gif', 67, 500)
             speak("Ok. Moving backward now")
-            player.switch_gif('idle-animation.gif', 67, 500)
-            send_message_to_arduino("move backward")
+            time.sleep(0.5)
+            switch_animation('idle-animation.gif', 67, 500)
+            # send_message_to_arduino("move backward")
         
         elif "explore" in text:
-            player.switch_gif('talking.gif', 67, 500)
+            switch_animation('talking.gif', 67, 500)
             speak("Ok. It is my time to explore")
-            player.switch_gif('idle-animation.gif', 67, 500)
-            explore_mode()
+            time.sleep(0.5)
+            switch_animation('idle-animation.gif', 67, 500)
+            # explore_mode()
 
         elif "find" in text:
             speak("I got you")
@@ -425,8 +451,8 @@ while True:
                 hook = "find the"
                 detected_object = text.replace(hook, "")
                 target_object = detected_object
-            if hunting_mode:
-                explore_mode()
+            # if hunting_mode:
+                # explore_mode()
         
         elif "i am" in text:
             name = text.split("i am", 1)[-1].strip()
@@ -444,7 +470,7 @@ while True:
                     successful_naming = associate_name_with_face(current_face_embedding, name)
 
                     if successful_naming:
-                        player.switch_gif('happy.gif', 67, 500)
+                        switch_animation('happy.gif', 67, 500)
                         speak(f"nice to meet you {name}. I will remember you from now on!")
                         player.switch_gif('idle-animation.gif', 67, 500)
                     else:
