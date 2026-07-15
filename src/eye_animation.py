@@ -2,28 +2,44 @@ from PIL import Image, ImageTk, ImageSequence
 from pathlib import Path
 import tkinter as tk
 
-root_dir = Path('src/animation_frames/idle')
+root_dir = Path('src/animation_frames')
 
 idle_image_frame_paths = []
+thinking_image_frame_paths = []
+talking_image_frame_paths = []
+happy_image_frame_paths = []
+
+animations = [idle_image_frame_paths, thinking_image_frame_paths, talking_image_frame_paths, happy_image_frame_paths]
+
 
 for path in root_dir.rglob('*'):
     if path.is_file() and 'idle' in path.name:
         idle_image_frame_paths.append(path)
         idle_image_frame_paths.sort()
+    elif path.is_file() and 'thinking' in path.name:
+        thinking_image_frame_paths.append(path)
+        thinking_image_frame_paths.sort()
+    elif path.is_file() and 'talking' in path.name:
+        talking_image_frame_paths.append(path)
+        talking_image_frame_paths.sort()
+    elif path.is_file() and 'happy' in path.name:
+        happy_image_frame_paths.append(path)
+        happy_image_frame_paths.sort()
 
-
-frames = [Image.open(path) for path in idle_image_frame_paths]
 
 fps = 15
 frame_duration = int(1000 / fps)
 
-frames[0].save(
-    'idle-animation.gif',
-    save_all=True,
-    append_images=frames[1:],
-    duration=frame_duration,
-    loop=0
-)
+for title, animation in zip(('idle', 'thinking', 'talking', 'happy'), animations):
+    frames = [Image.open(path) for path in animation]
+
+    frames[0].save(
+        f'{title}-animation.gif',
+        save_all=True,
+        append_images=frames[1:],
+        duration=frame_duration,
+        loop=0
+    )
 
 
 class GIFPlayer:
