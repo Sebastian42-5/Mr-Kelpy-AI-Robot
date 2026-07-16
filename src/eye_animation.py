@@ -1,6 +1,7 @@
 from PIL import Image, ImageTk, ImageSequence
 from pathlib import Path
 import tkinter as tk
+import time
 
 root_dir = Path('src/animation_frames')
 
@@ -32,6 +33,7 @@ frame_duration = int(1000 / fps)
 
 for title, animation in zip(('idle', 'thinking', 'talking', 'happy'), animations):
     frames = [Image.open(path) for path in animation]
+    
 
     frames[0].save(
         f'{title}-animation.gif',
@@ -90,4 +92,9 @@ if __name__ == "__main__":
     root = tk.Tk()
     root.attributes('-fullscreen', True)
     player = GIFPlayer(root, 'idle-animation.gif', 67, 500)
+    
+    root.after( 5000, lambda: player.switch_gif('thinking-animation.gif', 67, 500))
+    root.after( 10000, lambda: player.switch_gif('talking-animation.gif', 67, 500))
+    root.after( 15000, lambda: player.switch_gif('happy-animation.gif', 67, 500))
+    
     root.mainloop()
