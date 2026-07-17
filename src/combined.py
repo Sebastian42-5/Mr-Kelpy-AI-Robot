@@ -123,7 +123,9 @@ recognizer = sr.Recognizer()
 engine = pyttsx3.init()
 
 def speak(text):
-    subprocess.run(["espeak", text])
+    engine.say(text)
+    engine.runAndWait()
+    # subprocess.run(["espeak", text])
 
 # def explore_mode():
 #     detected_walls = {}
@@ -398,7 +400,7 @@ while True:
 
         # robot switches to thinking mode
 
-        switch_animation('thinking.gif', 67, 500)
+        switch_animation('thinking-animation.gif', 67, 500)
 
         print(f"Heard: {text}")
 
@@ -411,34 +413,34 @@ while True:
             webbrowser.open('https://archive.org/details/primal-s-2-e-10/Primal+S1E2.mp4')
 
         elif "hello" in text:
-            switch_animation('happy.gif', 67, 500)
+            switch_animation('happy-animation.gif', 67, 500)
             speak("Hello how are you doing")
             time.sleep(0.5)
             switch_animation('idle-animation.gif', 67, 500)
            
 
         elif "good" in text:
-            switch_animation('talking.gif', 67, 500)
+            switch_animation('talking-animation.gif', 67, 500)
             speak("Very good. Glad to be at your service!")
             time.sleep(0.5)
             switch_animation('idle-animation.gif', 67, 500)
 
         elif "forward" in text:
-            switch_animation('talking.gif', 67, 500)
+            switch_animation('talking-animation.gif', 67, 500)
             speak("Ok. Moving forward now.")
             time.sleep(0.5)
             switch_animation('idle-animation.gif', 67, 500)
             # send_message_to_arduino("move forward")
 
         elif "backward" in text:
-            switch_animation('talking.gif', 67, 500)
+            switch_animation('talking-animation.gif', 67, 500)
             speak("Ok. Moving backward now")
             time.sleep(0.5)
             switch_animation('idle-animation.gif', 67, 500)
             # send_message_to_arduino("move backward")
         
         elif "explore" in text:
-            switch_animation('talking.gif', 67, 500)
+            switch_animation('talking-animation.gif', 67, 500)
             speak("Ok. It is my time to explore")
             time.sleep(0.5)
             switch_animation('idle-animation.gif', 67, 500)
@@ -470,7 +472,7 @@ while True:
                     successful_naming = associate_name_with_face(current_face_embedding, name)
 
                     if successful_naming:
-                        switch_animation('happy.gif', 67, 500)
+                        switch_animation('happy-animation.gif', 67, 500)
                         speak(f"nice to meet you {name}. I will remember you from now on!")
                         player.switch_gif('idle-animation.gif', 67, 500)
                     else:
