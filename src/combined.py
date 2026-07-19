@@ -21,6 +21,7 @@ import pickle
 import tkinter as tk
 import keyboard
 from skimage.metrics import structural_similarity as ssim
+import queue
 
 # libraries to install
 
@@ -120,12 +121,28 @@ def save_convo_to_json(user_input, response):
         
 
 recognizer = sr.Recognizer()
-engine = pyttsx3.init()
+speech_queue = queue.Queue()
 
-def speak(text):
+
+def speech_worker():
+    engine = pyttsx3.init()
+    while True:
+        try:
+            text = speech_queue.get(timeout=1)
+        except queue.Empty:
+            continue
+        if text is None:
+            break
     engine.say(text)
     engine.runAndWait()
+    speech_queue.task_done()
     # subprocess.run(["espeak", text])
+
+def speak(text):
+    speech_queue.put(text)
+
+speech_thread = threading.Thread(target=speech_worker, daemon=True)
+speech_thread.start()
 
 # def explore_mode():
 #     detected_walls = {}
