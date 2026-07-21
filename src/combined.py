@@ -33,7 +33,6 @@ from eye_animation import GIFPlayer
 from face_greeting import load_db, get_face_embedding, get_similarity_score, associate_name_with_face, process_face, recognize_face
 
 recognizer = Recognizer()
-engine = pyttsx3.init()
 
 # load pretrained models
 
@@ -125,7 +124,6 @@ speech_queue = queue.Queue()
 
 
 def speech_worker():
-    engine = pyttsx3.init()
     while True:
         try:
             text = speech_queue.get(timeout=1)
@@ -133,9 +131,11 @@ def speech_worker():
             continue
         if text is None:
             break
-    engine.say(text)
-    engine.runAndWait()
-    speech_queue.task_done()
+        engine = pyttsx3.init()
+        engine.say(text)
+        engine.runAndWait()
+        del engine
+        speech_queue.task_done()
     # subprocess.run(["espeak", text])
 
 def speak(text):
