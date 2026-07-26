@@ -22,6 +22,7 @@ import tkinter as tk
 import keyboard
 from skimage.metrics import structural_similarity as ssim
 import queue
+from concurrent.futures import ThreadPoolExecutor
 
 # libraries to install
 
@@ -120,29 +121,26 @@ def save_convo_to_json(user_input, response):
         
 
 recognizer = sr.Recognizer()
-speech_queue = queue.Queue()
 
 
-def speech_worker():
-    while True:
-        try:
-            text = speech_queue.get(timeout=1)
-        except queue.Empty:
-            continue
-        if text is None:
-            break
-        engine = pyttsx3.init()
-        engine.say(text)
-        engine.runAndWait()
-        del engine
-        speech_queue.task_done()
+speech_executor = ThreadPoolExecutor(max_workers=1)
+
+def speech_worker(text):
+    engine = pyttsx3.init()
+    engine.say(text)
+    start_time = time.perf_counter()
+    engine.runAndWait()
+    end_time = time.perf_counter()
+    del engine
+    speaking_time = end_time - start_time
+    return speaking_time
     # subprocess.run(["espeak", text])
 
 def speak(text):
-    speech_queue.put(text)
+    # submit the worker without arguments; the worker reads from speech_queue
+    future = speech_executor.submit(speech_worker, text)
+    return future
 
-speech_thread = threading.Thread(target=speech_worker, daemon=True)
-speech_thread.start()
 
 # def explore_mode():
 #     detected_walls = {}
@@ -429,8 +427,6 @@ while True:
         print("Recognizing...")
         text = recognizer.recognize_google(audio).lower()
 
-        previous_text = text
-
         # robot switches to thinking mode
 
         switch_animation('thinking-animation.gif', 67, 500)
@@ -447,35 +443,35 @@ while True:
 
         elif "hello" in text:
             switch_animation('happy-animation.gif', 67, 500)
-            speak("Hello how are you doing")
-            time.sleep(1.5)
+            future = speak("Hello how are you doing")
+            speaking_time = future.result()
             switch_animation('idle-animation.gif', 67, 500)
            
 
         elif "good" in text:
             switch_animation('talking-animation.gif', 67, 500)
-            speak("Very good. Glad to be at your service!")
-            time.sleep(1.5)
+            future = speak("Very good. Glad to be at your service!")
+            speaking_time = future.result()
             switch_animation('idle-animation.gif', 67, 500)
 
         elif "forward" in text:
             switch_animation('talking-animation.gif', 67, 500)
-            speak("Ok. Moving forward now.")
-            time.sleep(1.5)
+            future = speak("Ok. Moving forward now.")
+            speaking_time = future.result()
             switch_animation('idle-animation.gif', 67, 500)
             # send_message_to_arduino("move forward")
 
         elif "backward" in text:
             switch_animation('talking-animation.gif', 67, 500)
-            speak("Ok. Moving backward now")
-            time.sleep(1.5)
+            future = speak("Ok. Moving backward now")
+            speaking_time = future.result()
             switch_animation('idle-animation.gif', 67, 500)
             # send_message_to_arduino("move backward")
         
         elif "explore" in text:
             switch_animation('talking-animation.gif', 67, 500)
-            speak("Ok. It is my time to explore")
-            time.sleep(1.5)
+            future = speak("Ok. It is my time to explore")
+            speaking_time = future.result()
             switch_animation('idle-animation.gif', 67, 500)
             # explore_mode()
 
@@ -513,19 +509,19 @@ while True:
         
         elif "healthy" in text:
             switch_animation('talking-animation.gif', 67, 500)
-            speak("Yes")
-            time.sleep(0.5)
+            future = speak("Yes")
+            speaking_time = future.result()
             switch_animation('idle-animation.gif', 67, 500)
             # in the future: custom train for the word "kelpy" to be recognized
             keyword_said = True
         
-        if keyword_said:
+        elif keyword_said:
             print("Waiting for prompt...")
-            prompt = text.split("healthy", 1)[-1].strip()
+            prompt = text.strip()
             response = send_speech_to_ollama(prompt)
             switch_animation('talking-animation.gif', 67, 500)
-            speak(response)
-            time.sleep(5.5)
+            future = speak(response)
+            speaking_time = future.result()
             switch_animation('idle-animation.gif', 67, 500)
             keyword_said = False
 
