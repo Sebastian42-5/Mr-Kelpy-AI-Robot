@@ -148,13 +148,13 @@ speech_thread.start()
 #     detected_walls = {}
 #     data = arduino.readline().decode('utf-8').strip()
 #     if data.startswith("distance"):
-#         distance = data
+#         distance n= data
     
 #     is_over = False
 
 #     prompt = f"""
 
-#     You are a robot navigating in a room 
+#     You are a robot navigatig in a room 
 
 #     Look at your previous action, unless it is the first action you do.
 #     The distance from an obstacle is {distance}
@@ -177,6 +177,17 @@ speech_thread.start()
 #     direction = response.message.content[1:] # type: ignore
 #     moves_made.append(direction)
 #     send_message_to_arduino(direction)
+
+def send_speech_to_ollama(text):
+    prompt = text 
+    messages = [
+        {
+            "role": "user",
+            "content": prompt
+        },
+    ]
+    response = chat(model="llama3.2:latest", messages=messages)
+    return response["message"]["content"]
 
 
 # Automatically naming objects from images taken by the object_tracking model
@@ -394,6 +405,9 @@ tk_thread_running = True
 tk_thread = threading.Thread(target=run_tk, daemon=True)
 tk_thread.start()
 
+command_list = ["youtube", "primal", "hello", "good", "forward", "good", "forward", "backward", "explore", "find", "I am"]
+
+keyword_said = False 
 
 while True:
     try:
@@ -413,7 +427,9 @@ while True:
             audio = recognizer.listen(source, timeout=3, phrase_time_limit=5)
 
         print("Recognizing...")
-        text = recognizer.recognize_sphinx(audio).lower()
+        text = recognizer.recognize_google(audio).lower()
+
+        previous_text = text
 
         # robot switches to thinking mode
 
@@ -432,34 +448,34 @@ while True:
         elif "hello" in text:
             switch_animation('happy-animation.gif', 67, 500)
             speak("Hello how are you doing")
-            time.sleep(0.5)
+            time.sleep(1.5)
             switch_animation('idle-animation.gif', 67, 500)
            
 
         elif "good" in text:
             switch_animation('talking-animation.gif', 67, 500)
             speak("Very good. Glad to be at your service!")
-            time.sleep(0.5)
+            time.sleep(1.5)
             switch_animation('idle-animation.gif', 67, 500)
 
         elif "forward" in text:
             switch_animation('talking-animation.gif', 67, 500)
             speak("Ok. Moving forward now.")
-            time.sleep(0.5)
+            time.sleep(1.5)
             switch_animation('idle-animation.gif', 67, 500)
             # send_message_to_arduino("move forward")
 
         elif "backward" in text:
             switch_animation('talking-animation.gif', 67, 500)
             speak("Ok. Moving backward now")
-            time.sleep(0.5)
+            time.sleep(1.5)
             switch_animation('idle-animation.gif', 67, 500)
             # send_message_to_arduino("move backward")
         
         elif "explore" in text:
             switch_animation('talking-animation.gif', 67, 500)
             speak("Ok. It is my time to explore")
-            time.sleep(0.5)
+            time.sleep(1.5)
             switch_animation('idle-animation.gif', 67, 500)
             # explore_mode()
 
@@ -494,8 +510,25 @@ while True:
                         player.switch_gif('idle-animation.gif', 67, 500)
                     else:
                         speak("I could not recognize you, since your face does not match my memory. Please try doing a different pose")
+        
+        elif "healthy" in text:
+            switch_animation('talking-animation.gif', 67, 500)
+            speak("Yes")
+            time.sleep(0.5)
+            switch_animation('idle-animation.gif', 67, 500)
+            # in the future: custom train for the word "kelpy" to be recognized
+            keyword_said = True
+        
+        if keyword_said:
+            print("Waiting for prompt...")
+            prompt = text.split("healthy", 1)[-1].strip()
+            response = send_speech_to_ollama(prompt)
+            switch_animation('talking-animation.gif', 67, 500)
+            speak(response)
+            time.sleep(5.5)
+            switch_animation('idle-animation.gif', 67, 500)
+            keyword_said = False
 
-            
 
     except sr.WaitTimeoutError:
         print("No speech detected")
