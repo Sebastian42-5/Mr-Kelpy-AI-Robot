@@ -27,7 +27,8 @@ def load_db(db_path=FACE_DB_PATH):
         return {'clusters': []}
     
 def save_db(face_db):
-    with open(FACE_DB_PATH, "f") as file:
+    os.makedirs(os.path.dirname(FACE_DB_PATH), exist_ok=True)
+    with open(FACE_DB_PATH, "wb") as file:
         pickle.dump(face_db, file)
 
 def get_face_embedding(face_bgr_cut):
@@ -55,8 +56,8 @@ def get_face_embedding(face_bgr_cut):
 def cosine_similarity(veca, vecb):
     return float(np.dot(veca, vecb))
 
-def update_cluster_centroid(cluster):
-    centroid = np.mean(cluster)
+def update_cluster_centroid(embeddings):
+    centroid = np.mean(embeddings, axis=0)
     norm = np.linalg.norm(centroid)
     if norm == 0:
         return centroid
@@ -71,10 +72,10 @@ def find_most_accurate_cluster(db, current_embed, only_named):
     else:
         threshold = CLUSTER_ASSOCIATION_THRESHOLD
 
-    for i, centroid in enumerate(db):
-        if only_named and db["name"] is None:
+    for i, cluster in enumerate(db["clusters"]):
+        if only_named and cluster["name"] is None:
             continue
-        similarity = cosine_similarity(centroid, current_embed)
+        similarity = cosine_similarity(cluster["centroid"], current_embed)
         if similarity > best_similarity:
             best_index = i 
             best_similarity = similarity 
@@ -82,73 +83,61 @@ def find_most_accurate_cluster(db, current_embed, only_named):
     if best_index is not None and best_similarity >= threshold:
         return best_index, best_similarity
     else:
-        return 0.0, None
+        return None, 0.0
                
 
-def process_face(face_crop_bgr, frame_index):
+def process_face(face_crop_bgr, frame_count):
     current_embed = get_face_embedding(face_crop_bgr)
 
     if current_embed is None:
         return None
 
     db = load_db(FACE_DB_PATH)
-    best_index, best_similarity = find_most_accurate_cluster(db, current_embed, only_named)
+    best_index, best_similarity = find_most_accurate_cluster(db, current_embed, only_named=False)
 
     if best_index is not None:
-        cluster_id = db["clusters"][best_index]["id"]
+        cluster = db["clusters"][best_index]
     # it's a new cluster
     else:
-        cluster_id = len(db["clusters"])
+        cluster = {
+            "id": len(db["clusters"]),
+            "name": None,
+            "embeddings": [],
+            "image_paths": [],
+            "centroid": None,
+        }
+        db["clusters"].append(cluster)
+ 
+        os.makedirs(FACE_IMAGES_DIR, exist_ok=True)
+        img_filename = f"{FACE_IMAGES_DIR}/cluster{cluster['id']}_frame{frame_count}.jpg"
+        cv2.imwrite(img_filename, face_crop_bgr)
     
-    img_filename = f"face_memory/images/cluster{cluster_id}_frame{frame_index}.jpg"
-    cv2.imwrite(img_filename, face_crop_bgr)
-
-    if best_index is not None: # if the embedding is already on the db
-        cluster = db["clusters"][cluster_id]
         cluster["embeddings"].append(current_embed)
         cluster["image_paths"].append(img_filename)
-        update_cluster_centroid(cluster)
-        print(f"the size of cluster {cluster_id} is now {len(cluster["embeddings"])}")
-    else:
-        new_cluster = {
-            "id": cluster_id,  
-            "name": None,
-            "embeddings": [current_embed],
-            "image_paths": [img_filename],
-            "centroid": None,
-
-        }
-        db["clusters"].append(new_cluster)
-    save_db(db)
-    return cluster
+        cluster["centroid"] = update_cluster_centroid(cluster["embeddings"]) 
+    
+        print(f"the size of cluster {cluster['id']} is now {len(cluster['embeddings'])}")
+    
+        save_db(db)
+        return cluster
 
 
 def get_similarity_score(img1_path, img2_path):
     img1 = cv2.imread(img1_path)
     img2 = cv2.imread(img2_path)
 
-    img1_gray = cv2.cvtColor(img1_path, cv2.COLOR_BGR2GRAY)
-    img2_gray = cv2.cvtColor(img2_path, cv2.COLOR_BGR2GRAY)
+    img1_gray = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+    img2_gray = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
 
     score, _ = ssim(img1_gray, img2_gray, full=True)
     return score
 
+
 def associate_name_with_face(current_embed, name):
     db = load_db(FACE_DB_PATH)
-
-    best_index = -1
-    best_similarity = 0
-
-    if current_embed not in db["clusters"]:
-        return False
     
-    for i, cluster in enumerate(db["clusters"]):
-        similarity_index = cosine_similarity(db["clusters"][i], cluster)
+    best_index, best_similarity = find_most_accurate_cluster(db, current_embed, only_named=False)
 
-        if similarity_index > best_similarity:
-            best_index = i 
-            best_similarity = similarity_index
-        
     if best_index is None or best_similarity < CLUSTER_ASSOCIATION_THRESHOLD:
         print("No name matches with this cluster")
         return False
@@ -183,5 +172,5 @@ def get_most_recently_added_face_embedding(db_snapshot):
             recently_grown_cluster = cluster
     
     if recently_grown_cluster:
-        return recently_grown_cluster["embedding"][-1]
+        return recently_grown_cluster["embeddings"][-1]
     return None
