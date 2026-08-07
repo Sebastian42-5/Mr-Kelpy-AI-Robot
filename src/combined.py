@@ -60,6 +60,8 @@ object_found = False
 
 state_lock = threading.Lock()
 
+greeting_thread_running = False
+
 
 # global variables for face detecting loop
 
@@ -283,8 +285,7 @@ def find_best_match_in_database(live_frame_embedding, spoken_label=None):
 # creating a logic to embed images as numerical vectors to optimize image database search
 
 
-
-def camera_loop(model):
+def camera_loop(model, name_queue):
 
     global frame_count, hunting_mode, target_object
     global latest_face_embedding, pending_greeting
@@ -296,6 +297,7 @@ def camera_loop(model):
     
     while cam_thread_running:
         try:
+
             timer = cv2.getTickCount()
             fps = cap.get(cv2.CAP_PROP_FPS)
             ret, frame = cap.read()
@@ -334,6 +336,7 @@ def camera_loop(model):
                             if matching_name not in people_greeted_this_session:
                                 pending_greeting = matching_name 
                                 people_greeted_this_session.add(matching_name)
+                                name_queue.put(matching_name)
                 
 
                 cv2.imwrite(f"output_frames/faces_frame_{frame_count}.jpg", frame) 
@@ -393,8 +396,26 @@ def camera_loop(model):
 # Train the model (this might take time, consider if needed)
 # model.train(data="data.yaml", epochs=100, imgsz=640, batch=16, device=0)
 
+name_queue = queue.Queue()
+
+def greeting(name_queue):
+    while True:
+        name = name_queue.get()
+        if name is None:
+            break
+        switch_animation('happy-animation.gif', 67, 500)
+        future = speak(f"Hello {name}. Nice to see you again!")
+        speaking_time = future.result()
+        switch_animation('idle-animation.gif', 67, 500)
+        print("Finished greeting")
+
+
+greeting_thread_running = True
+greeting_thread = threading.Thread(target=greeting, args=(name_queue,), daemon=True)
+greeting_thread.start()
+
 cam_thread_running = True
-cam_thread = threading.Thread(target=camera_loop, args=(model,), daemon=True)
+cam_thread = threading.Thread(target=camera_loop, args=(model, name_queue), daemon=True)
 cam_thread.start()
 
 def run_tk():
@@ -425,8 +446,8 @@ while True:
         print("Listening...")
 
         with face_state_lock:
-            greeding_name = pending_greeting
             pending_greeting = None
+            current_face_embedding = latest_face_embedding
 
 
         with sr.Microphone() as source:
