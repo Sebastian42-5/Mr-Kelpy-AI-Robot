@@ -186,7 +186,7 @@ def send_speech_to_ollama(text):
             "content": prompt
         },
     ]
-    response = chat(model="llama3.2:latest", messages=messages)
+    response = chat(model="llama3.2:1b", messages=messages)
     return response["message"]["content"]
 
 
