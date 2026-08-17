@@ -108,18 +108,18 @@ def process_face(face_crop_bgr, frame_count):
         }
         db["clusters"].append(cluster)
  
-        os.makedirs(FACE_IMAGES_DIR, exist_ok=True)
-        img_filename = f"{FACE_IMAGES_DIR}/cluster{cluster['id']}_frame{frame_count}.jpg"
-        cv2.imwrite(img_filename, face_crop_bgr)
+    os.makedirs(FACE_IMAGES_DIR, exist_ok=True)
+    img_filename = f"{FACE_IMAGES_DIR}/cluster{cluster['id']}_frame{frame_count}.jpg"
+    cv2.imwrite(img_filename, face_crop_bgr)
+
+    cluster["embeddings"].append(current_embed)
+    cluster["image_paths"].append(img_filename)
+    cluster["centroid"] = update_cluster_centroid(cluster["embeddings"]) 
+
+    print(f"the size of cluster {cluster['id']} is now {len(cluster['embeddings'])}")
     
-        cluster["embeddings"].append(current_embed)
-        cluster["image_paths"].append(img_filename)
-        cluster["centroid"] = update_cluster_centroid(cluster["embeddings"]) 
-    
-        print(f"the size of cluster {cluster['id']} is now {len(cluster['embeddings'])}")
-    
-        save_db(db)
-        return cluster
+    save_db(db)
+    return cluster
 
 
 def get_similarity_score(img1_path, img2_path):
