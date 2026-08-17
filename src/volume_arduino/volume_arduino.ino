@@ -1,3 +1,5 @@
+
+
 int pot;
 int potPin = A0;
 

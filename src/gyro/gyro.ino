@@ -11,38 +11,17 @@ float gx, gy, gz;
 
 float gx_offset = 0;
 float gy_offset = 0;
-float gz_offset = 0;
 
 float roll_acc, pitch_acc;
 float roll = 0;
 float pitch = 0;
-float yaw = 0;
 
 unsigned long prev_time;
 float dt;
 
-int ena = 5;
-int in1 = 6;
-int in2 = 7;
-int in3 = 8;
-int in4 = 9;
-int enb = 10;
-
-
-float desired_angle_change = 90; 
-bool turning_done = false;
-
 
 void setup() {
   // put your setup code here, to run once:
-
-  pinMode(ena, OUTPUT);
-  pinMode(in1, OUTPUT);
-  pinMode(in2, OUTPUT);
-  pinMode(in3, OUTPUT);
-  pinMode(in4, OUTPUT);
-  pinMode(enb, OUTPUT);
-
   Wire.begin();
   Serial.begin(9600);
   while(!Serial);
@@ -53,18 +32,16 @@ void setup() {
   Wire.endTransmission(true);
 
   Serial.println("Calibrating gyro... Keep IMU flat and still.");
-  long sum_gx = 0, sum_gy = 0, sum_gz = 0;
+  long sum_gx = 0, sum_gy = 0;
   const int samples = 500;
   for (int i = 0; i < samples; i++) {
     readRawData();
     sum_gx += raw_gx;
     sum_gy += raw_gy;
-    sum_gz += raw_gz;
     delay(3);
   }
   gx_offset = (float)sum_gx / samples;
   gy_offset = (float)sum_gy / samples;
-  gz_offset = (float)sum_gz / samples;
   Serial.println("Calibration complete.");
 
   prev_time = millis();
@@ -82,16 +59,11 @@ void loop() {
   // 2. Convert Gyroscope Raw LSB to degrees per second (°/s) and subtract offset
   gx = (raw_gx - gx_offset) / 131.0;
   gy = (raw_gy - gy_offset) / 131.0;
-  gz = (raw_gz - gz_offset) / 131.0;
 
   // Calculate elapsed time (dt) in seconds
   unsigned long current_time = millis();
   dt = (current_time - prev_time) / 1000.0;
   prev_time = current_time;
-
-  yaw += gz * dt;
-
-  Serial.println("Yaw:"); Serial.println(yaw);
 
   // 3. Compute absolute angles from Accelerometer using Trigonometry
   // atan2 returns radians; multiply by 180/PI to get degrees
@@ -103,62 +75,11 @@ void loop() {
   roll  = 0.98 * (roll + gx * dt) + 0.02 * roll_acc;
   pitch = 0.98 * (pitch + gy * dt) + 0.02 * pitch_acc;
 
-    // Print filtered angles
+  // Print filtered angles
   Serial.print("Roll: "); Serial.print(roll);
   Serial.print(" | Pitch: "); Serial.println(pitch);
 
-  if(!turning_done) {
-    if(abs(yaw) >= desired_angle_change) {
-      stopMotor();
-      turning_done = true;
-      Serial.println("Turning complete!");
-    } else {
-      turnRight();
-    }
-  }
-}
-
-void turnRight() {
-  digitalWrite(in1, HIGH);
-  digitalWrite(in2, LOW);
-  digitalWrite(in3, LOW);
-  digitalWrite(in4, HIGH);
-  analogWrite(ena, 60);
-  analogWrite(enb, 60);
-}
-
-void turnLeft() {
-  digitalWrite(in1, LOW);
-  digitalWrite(in2, HIGH);
-  digitalWrite(in3, HIGH);
-  digitalWrite(in4, LOW);
-  analogWrite(ena, 60);
-  analogWrite(enb, 60);
-}
-
-void goForward() {
-  digitalWrite(in1, HIGH);
-  digitalWrite(in2, LOW);
-  digitalWrite(in3, HIGH);
-  digitalWrite(in4, LOW);
-  analogWrite(ena, 120);
-  analogWrite(enb, 120);
-}
-
-void goBackward() {
-  digitalWrite(in1, LOW);
-  digitalWrite(in2, HIGH);
-  digitalWrite(in3, LOW);
-  digitalWrite(in4, HIGH);
-  analogWrite(ena, 120);
-  analogWrite(enb, 120);
-}
-
-void stopMotor() {
-  digitalWrite(in1, LOW);
-  digitalWrite(in2, LOW);
-  digitalWrite(in3, LOW);
-  digitalWrite(in4, LOW);
+  delay(10); 
 }
 
 void readRawData() {
@@ -184,7 +105,6 @@ void readRawData() {
   // Output data to serial monitor and plotter
   // For Serial Plotter, it's important that all values are on one line, separated by tabs.
   // This will allow the plotter to display each parameter as a separate line.
+  
+  delay(100);
 }
-
-
-
