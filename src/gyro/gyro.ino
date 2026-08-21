@@ -6,105 +6,134 @@ int16_t raw_ax, raw_ay, raw_az;
 int16_t raw_gx, raw_gy, raw_gz;
 int16_t temp;
 
-float ax, ay, az;
-float gx, gy, gz;
+float gx_offset = 0, gy_offset = 0, gz_offset = 0;
 
-float gx_offset = 0;
-float gy_offset = 0;
-
-float roll_acc, pitch_acc;
-float roll = 0;
-float pitch = 0;
+float yaw = 0;  
 
 unsigned long prev_time;
 float dt;
 
+int ena = 5, in1 = 6, in2 = 7, in3 = 8, in4 = 9, enb = 10;
+
+float desired_angle_change = 90.0; // degrees
+bool turningDone = false;
 
 void setup() {
-  // put your setup code here, to run once:
+  pinMode(ena, OUTPUT); pinMode(in1, OUTPUT); pinMode(in2, OUTPUT);
+  pinMode(in3, OUTPUT); pinMode(in4, OUTPUT); pinMode(enb, OUTPUT);
+
   Wire.begin();
   Serial.begin(9600);
-  while(!Serial);
+  while (!Serial);
 
   Wire.beginTransmission(MPU);
   Wire.write(0x6B);
   Wire.write(0);
   Wire.endTransmission(true);
 
-  Serial.println("Calibrating gyro... Keep IMU flat and still.");
-  long sum_gx = 0, sum_gy = 0;
+  Serial.println("Calibrating gyro... keep robot still.");
+  long sum_gx = 0, sum_gy = 0, sum_gz = 0;
   const int samples = 500;
   for (int i = 0; i < samples; i++) {
     readRawData();
     sum_gx += raw_gx;
     sum_gy += raw_gy;
+    sum_gz += raw_gz;
     delay(3);
   }
   gx_offset = (float)sum_gx / samples;
   gy_offset = (float)sum_gy / samples;
+  gz_offset = (float)sum_gz / samples;
   Serial.println("Calibration complete.");
 
   prev_time = millis();
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
   readRawData();
 
-  // 1. Convert Accelerometer Raw LSB to 'g' units
-  ax = raw_ax / 16384.0;
-  ay = raw_ay / 16384.0;
-  az = raw_az / 16384.0;
+  if(Serial.available() > 0) {
+    String desired_object_angle_message = Serial.readStringUntil("\n"); 
+    desired_object_angle_message.trim();
 
-  // 2. Convert Gyroscope Raw LSB to degrees per second (°/s) and subtract offset
-  gx = (raw_gx - gx_offset) / 131.0;
-  gy = (raw_gy - gy_offset) / 131.0;
+    desired_angle_change = desired_object_angle_message.toInt();
+  }
 
-  // Calculate elapsed time (dt) in seconds
+  float gz = (raw_gz - gz_offset) / 131.0; // deg/s
+
   unsigned long current_time = millis();
   dt = (current_time - prev_time) / 1000.0;
   prev_time = current_time;
 
-  // 3. Compute absolute angles from Accelerometer using Trigonometry
-  // atan2 returns radians; multiply by 180/PI to get degrees
-  roll_acc  = atan2(ay, az) * 180.0 / M_PI;
-  pitch_acc = atan2(-ax, sqrt(ay * ay + az * az)) * 180.0 / M_PI;
+  yaw += gz * dt;
 
-  // 4. Complementary Filter Fusion
-  // High weighting (0.98) on smooth gyro integration; low weighting (0.02) on stable accel absolute reference
-  roll  = 0.98 * (roll + gx * dt) + 0.02 * roll_acc;
-  pitch = 0.98 * (pitch + gy * dt) + 0.02 * pitch_acc;
+  Serial.print("Yaw: "); Serial.println(yaw);
 
-  // Print filtered angles
-  Serial.print("Roll: "); Serial.print(roll);
-  Serial.print(" | Pitch: "); Serial.println(pitch);
+  if (!turningDone) {
+    if (abs(yaw) >= desired_angle_change) {
+      stop_motor();
+      turningDone = true;
+      Serial.println("Turn complete.");
+    } else {
+      turnRight();
+    }
+  }
+}
 
-  delay(10); 
+void turnRight() {
+  digitalWrite(in1, HIGH);
+  digitalWrite(in2, LOW);
+  digitalWrite(in3, LOW);
+  digitalWrite(in4, HIGH);
+  analogWrite(ena, 100);
+  analogWrite(enb, 100);
+}
+
+void turnLeft() {
+  digitalWrite(in1, LOW);
+  digitalWrite(in2, HIGH);
+  digitalWrite(in3, HIGH);
+  digitalWrite(in4, LOW);
+  analogWrite(ena, 100);
+  analogWrite(enb, 100);
+}
+
+void goForward() {
+  digitalWrite(in1, HIGH);
+  digitalWrite(in2, LOW);
+  digitalWrite(in3, HIGH);
+  digitalWrite(in4, LOW);
+  analogWrite(ena, 120);
+  analogWrite(enb, 120);
+}
+
+void goBackward() {
+  digitalWrite(in1, LOW);
+  digitalWrite(in2, HIGH);
+  digitalWrite(in3, LOW);
+  digitalWrite(in4, HIGH);
+  analogWrite(ena, 120);
+  analogWrite(enb, 120);
+}
+
+void stop_motor() {
+  digitalWrite(in1, LOW);
+  digitalWrite(in2, LOW);
+  digitalWrite(in3, LOW);
+  digitalWrite(in4, LOW);
 }
 
 void readRawData() {
   Wire.beginTransmission(MPU);
   Wire.write(0x3B);
   Wire.endTransmission(false);
-
   Wire.requestFrom(MPU, 14, true);
 
-  // Read accelerometer data
-  raw_ax = Wire.read() << 8 | Wire.read(); // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)
-  raw_ay = Wire.read() << 8 | Wire.read(); // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
-  raw_az = Wire.read() << 8 | Wire.read(); // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
-
-  // Read temperature data
-  temp = Wire.read() << 8 | Wire.read(); // 0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
-
-  // Read gyroscope data
-  raw_gx = Wire.read() << 8 | Wire.read(); // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
-  raw_gy = Wire.read() << 8 | Wire.read(); // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
-  raw_gz = Wire.read() << 8 | Wire.read(); // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
-
-  // Output data to serial monitor and plotter
-  // For Serial Plotter, it's important that all values are on one line, separated by tabs.
-  // This will allow the plotter to display each parameter as a separate line.
-  
-  delay(100);
+  raw_ax = Wire.read() << 8 | Wire.read();
+  raw_ay = Wire.read() << 8 | Wire.read();
+  raw_az = Wire.read() << 8 | Wire.read();
+  temp   = Wire.read() << 8 | Wire.read();
+  raw_gx = Wire.read() << 8 | Wire.read();
+  raw_gy = Wire.read() << 8 | Wire.read();
+  raw_gz = Wire.read() << 8 | Wire.read();
 }

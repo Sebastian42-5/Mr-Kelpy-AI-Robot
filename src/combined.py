@@ -59,6 +59,7 @@ face_detection_mode = False
 object_found = False
 
 
+
 state_lock = threading.Lock()
 
 greeting_thread_running = False
@@ -103,15 +104,19 @@ def recognize_arduino_port():
         print(f"{p.device} - {p.description}")
     return None
 
-# arduino_port = recognize_arduino_port()
-    
-# arduino = serial.Serial(port="/dev/ttyACM0", baudrate=9600, timeout=0.1)
+arduino_port = recognize_arduino_port()
 
-# def send_message_to_arduino(message):
-#     arduino.write(bytes(message, 'utf-8'))
-#     time.sleep(0.05)
-#     data = arduino.readline().decode('utf-8').strip()
-#     print(data)
+# port = "/dev/ttyACM0"
+    
+arduino = serial.Serial(port=arduino_port, baudrate=9600, timeout=0.1)
+
+def send_message_to_arduino(message):
+    arduino.write(bytes(message, 'utf-8'))
+    time.sleep(0.05)
+    response = arduino.readline().decode('utf-8').strip()
+    return response
+
+
 
 def save_convo_to_json(user_input, response):
     convo = {
@@ -290,6 +295,7 @@ def camera_loop(model, name_queue):
 
     global frame_count, hunting_mode, target_object
     global latest_face_embedding, pending_greeting
+    global angle_x
 
     os.makedirs(f'output_frames/objects', exist_ok=True)
     os.makedirs(f'output_frames/faces', exist_ok=True)
@@ -510,6 +516,14 @@ while True:
             speaking_time = future.result()
             switch_animation('idle-animation.gif', 67, 500)
             # explore_mode()
+
+        elif "turn" in text:
+            switch_animation('talking-animation.gif', 67, 500)
+            future = speak("Ok. It is my time to try the tilt angle logic")
+            speaking_time = future.result()
+            switch_animation('idle-animation.gif', 67, 500)
+            while current_robot_angle > 0:
+                current_robot_angle = int(send_message_to_arduino(angle_x))
 
         elif "find" in text:
             speak("I got you")
