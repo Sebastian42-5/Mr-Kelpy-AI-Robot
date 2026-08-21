@@ -36,6 +36,8 @@ from angle_estimation import load_calibration, find_angle_from_bbox
 
 recognizer = Recognizer()
 
+camera_matrix, dist_coeffs = load_calibration()
+
 # load pretrained models
 
 model = YOLO("yolov8n.pt")
@@ -150,39 +152,39 @@ def speak(text):
     return future
 
 
-# def explore_mode():
-#     detected_walls = {}
-#     data = arduino.readline().decode('utf-8').strip()
-#     if data.startswith("distance"):
-#         distance n= data
+def explore_mode():
+    detected_walls = {}
+    data = arduino.readline().decode('utf-8').strip()
+    if data.startswith("distance"):
+        distance = data
     
-#     is_over = False
+    is_over = False
 
-#     prompt = f"""
+    prompt = f"""
 
-#     You are a robot navigatig in a room 
+    You are a robot navigatig in a room 
 
-#     Look at your previous action, unless it is the first action you do.
-#     The distance from an obstacle is {distance}
+    Look at your previous action, unless it is the first action you do.
+    The distance from an obstacle is {distance}
 
-#     what should you do? 
-#     Respond by either: forward, backward, left, or right
+    what should you do? 
+    Respond by either: forward, backward, left, or right
 
-#     save your actions with an index, so it would be: 1forward, 2left, 3right, etc. 
-#     """
+    save your actions with an index, so it would be: 1forward, 2left, 3right, etc. 
+    """
 
-#     messages = [
-#         {
-#             "role":"user",
-#             "content": prompt
-#         },
-#     ]
+    messages = [
+        {
+            "role":"user",
+            "content": prompt
+        },
+    ]
 
-#     response = chat(model="llama3.2:latest", messages=messages)
-#     messages.append(response.message) # type: ignore
-#     direction = response.message.content[1:] # type: ignore
-#     moves_made.append(direction)
-#     send_message_to_arduino(direction)
+    response = chat(model="llama3.2:latest", messages=messages)
+    messages.append(response.message) # type: ignore
+    direction = response.message.content[1:] # type: ignore
+    moves_made.append(direction)
+    send_message_to_arduino(direction)
 
 def send_speech_to_ollama(text):
     prompt = text 
