@@ -141,10 +141,10 @@ def read_message_from_arduino():
             if response == 'DONE':
                 with state_lock:
                     turning_in_progress = False
-            elif response.startswith("distance"):
+            elif response.startswith("DISTANCE"):
                 distance = response
                 print(f"Distance from obstacle: {distance}")
-            elif response.startswith("TARGET") or response.startwith("YAW"):
+            elif response.startswith("TARGET") or response.startswith("YAW"):
                 print(f"Arduino response: {response}")
         except Exception as e:
             print(f"Error reading from Arduino: {e}")
