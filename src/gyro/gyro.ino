@@ -18,9 +18,16 @@ int ena = 5, in1 = 6, in2 = 7, in3 = 8, in4 = 9, enb = 10;
 float desired_angle_change = 90.0; // degrees
 bool turningDone = false;
 
+int echoPin = 12;
+int trigPin = 11;
+
 void setup() {
   pinMode(ena, OUTPUT); pinMode(in1, OUTPUT); pinMode(in2, OUTPUT);
   pinMode(in3, OUTPUT); pinMode(in4, OUTPUT); pinMode(enb, OUTPUT);
+
+  pinMode(trigPin, OUTPUT); pinMode(echoPin, INPUT);
+
+
 
   Wire.begin();
   Serial.begin(9600);
@@ -68,6 +75,25 @@ void loop() {
   yaw += gz * dt;
 
   Serial.print("Yaw: "); Serial.println(yaw);
+
+  // ultrasonic logic
+
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);      
+
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);     
+  digitalWrite(trigPin, LOW);
+
+  duration = pulseIn(echoPin, HIGH); 
+ 
+  distanceCm = (duration * 0.0343) / 2; 
+
+  Serial.print("Distance: ");
+  Serial.print(distanceCm);
+  Serial.println(" cm");
+
+  delay(500); 
 
   if (!turningDone) {
     if (abs(yaw) >= desired_angle_change) {
