@@ -8,7 +8,7 @@ int16_t temp;
 
 float gx_offset = 0, gy_offset = 0, gz_offset = 0;
 
-float yaw = 0;  
+float yaw = 0;  // the reference point for the yaw will always be zero 
 
 unsigned long prev_time;
 float dt;

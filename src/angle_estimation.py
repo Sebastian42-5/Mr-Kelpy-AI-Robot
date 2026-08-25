@@ -46,11 +46,13 @@ def find_angle_from_pixel_center(pixel_x, pixel_y):
 
     angle_x = math.atan2(x_offset, fx)
     angle_y = math.atan2(y_offset, fy)
+
+    return angle_x * 100, angle_y * 100
     
 
 def find_angle_from_bbox(x1, y1, x2, y2):
     center_x = (x1 + x2) / 2
     center_y = (y1 + y2) / 2
 
-    find_angle_from_pixel_center(center_x, center_y)
+    return center_x, center_y
     
