@@ -85,9 +85,9 @@ void loop() {
   delayMicroseconds(10);     
   digitalWrite(trigPin, LOW);
 
-  duration = pulseIn(echoPin, HIGH); 
+  float duration = pulseIn(echoPin, HIGH); 
  
-  distanceCm = (duration * 0.0343) / 2; 
+  float distanceCm = (duration * 0.0343) / 2; 
 
   Serial.print("Distance: ");
   Serial.print(distanceCm);
