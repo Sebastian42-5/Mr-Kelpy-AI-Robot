@@ -8,14 +8,28 @@ int16_t temp;
 
 float gx_offset = 0, gy_offset = 0, gz_offset = 0;
 
-float yaw = 0;  
+float target_yaw = 0;  // the reference point for the yaw will always be zero 
+float TURNING_TOLERANCE = 2.0; // how much the robot can deviate from the target angle before it stops turning
+float error = 0; // the difference between the target angle and the current angle
+
+enum RobotState {
+  IDLE,
+  TURNING,
+  MOVING_FORWARD,
+  MOVING_BACKWARD
+};
+
+RobotState robot_state = IDLE;
 
 unsigned long prev_time;
 float dt;
 
+unsigned long last_report_time = 0;
+const unsigned long REPORT_INTERVAL = 100; // the current yaw of the robot gets reported every 100 milliseconds
+
 int ena = 5, in1 = 6, in2 = 7, in3 = 8, in4 = 9, enb = 10;
 
-float desired_angle_change = 90.0; // degrees
+
 bool turningDone = false;
 
 int echoPin = 12;
@@ -59,12 +73,7 @@ void setup() {
 void loop() {
   readRawData();
 
-  if(Serial.available() > 0) {
-    String desired_object_angle_message = Serial.readStringUntil("\n"); 
-    desired_object_angle_message.trim();
-
-    desired_angle_change = desired_object_angle_message.toInt();
-  }
+  handleTurningCommand();
 
   float gz = (raw_gz - gz_offset) / 131.0; // deg/s
 
@@ -72,9 +81,7 @@ void loop() {
   dt = (current_time - prev_time) / 1000.0;
   prev_time = current_time;
 
-  yaw += gz * dt;
-
-  Serial.print("Yaw: "); Serial.println(yaw);
+  target_yaw += gz * dt;
 
   // ultrasonic logic
 
@@ -89,19 +96,43 @@ void loop() {
  
   float distanceCm = (duration * 0.0343) / 2; 
 
-  Serial.print("Distance: ");
+  Serial.print("DISTANCE: ");
   Serial.print(distanceCm);
   Serial.println(" cm");
 
   delay(500); 
 
-  if (!turningDone) {
-    if (abs(yaw) >= desired_angle_change) {
+  if (robot_state == TURNING) {
+    float error = target_yaw - desired_angle_change;
+
+    while (error > 180) error -= 360; // Normalize to [-180, 180]
+    while (error < -180) error += 360; // Normalize to [-180, 180]
+
+    if (abs(error) <= TURNING_TOLERANCE) {
       stop_motor();
-      turningDone = true;
-      Serial.println("Turn complete.");
+      robot_state = IDLE;
+      Serial.println("DONE");
     } else {
-      turnRight();
+        if(error > 0) {
+          turnLeft();
+        } else {
+          turnRight();
+        } 
+        if (current_time - last_report_time >= REPORT_INTERVAL) {
+          Serial.print("YAW: "); Serial.println(target_yaw);
+          last_report_time = current_time;
+        }
+    }
+
+    elif (current_time - last_report_time >= REPORT_INTERVAL) {
+    Serial.print("YAW: "); Serial.println(target_yaw);
+    last_report_time = current_time;
+    }
+
+    elif (robot_state == MOVING_FORWARD) {
+      goForward();
+    } else if (robot_state == MOVING_BACKWARD) {
+      goBackward();
     }
   }
 }
@@ -162,4 +193,26 @@ void readRawData() {
   raw_gx = Wire.read() << 8 | Wire.read();
   raw_gy = Wire.read() << 8 | Wire.read();
   raw_gz = Wire.read() << 8 | Wire.read();
+}
+
+void handleTurningCommand() {
+
+  if(Serial.available() > 0) {
+    String command = Serial.readStringUntil('\n');
+    command.trim();
+
+    if (command.startsWith("TURN") && robot_state == IDLE) {
+
+      float desired_angle_change = command.substring(5).toFloat(); // Extract the desired angle change from the command
+
+      target_yaw = yaw + desired_angle_change; // Set the target yaw based on the current yaw and the desired change
+      
+      while(target_yaw > 180) target_yaw -= 360; // Normalize to [-180, 180]
+      while(target_yaw < -180) target_yaw += 360; // Normalize to [-180, 180]
+
+      robot_state = TURNING;
+
+      Serial.println("TARGET: " + String(target_yaw));
+    }
+  }
 }

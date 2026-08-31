@@ -32,7 +32,7 @@ from transformers import CLIPProcessor, CLIPModel
 
 from eye_animation import GIFPlayer
 from face_greeting import load_db, get_face_embedding, get_similarity_score, associate_name_with_face, process_face, recognize_face
-from angle_estimation import load_calibration, find_angle_from_bbox
+from angle_estimation import load_calibration, find_angle_from_bbox, find_angle_from_pixel_center
 
 recognizer = Recognizer()
 
@@ -59,8 +59,10 @@ target_object = ""
 cam_thread_running = False
 face_detection_mode = False
 object_found = False
+turning_in_progress = False 
+turning_to_face_object_mode = False 
 
-
+arduino_write_block = threading.Lock()
 
 state_lock = threading.Lock()
 
@@ -112,13 +114,44 @@ arduino_port = recognize_arduino_port()
     
 arduino = serial.Serial(port=arduino_port, baudrate=9600, timeout=0.1)
 
-def send_message_to_arduino(message):
-    arduino.write(bytes(message, 'utf-8'))
-    time.sleep(0.05)
-    response = arduino.readline().decode('utf-8').strip()
-    return response
+def send_turning_message_to_arduino(delta_angle):
+    global turning_in_progress
+    if turning_in_progress: 
+        return False 
+    
+    with state_lock:
+        arduino.write(f"Target object is at {delta_angle:.2f} degrees\n".encode('utf-8'))
+    print(f"Sent message to turn {delta_angle:.2f} degrees to Arduino")
+    return True 
+
+def send_action_message_to_arduino(action):
+    with face_state_lock:
+        arduino.write(f"The robot should {action}").encode('utf-8')
+        print(f"Sent message to {action} to Arduino")
 
 
+def read_message_from_arduino():
+    global turning_in_progress
+
+    while True: 
+        try:
+            response = arduino.readline().decode('utf-8').strip()
+            if not response:
+                continue 
+            if response == 'DONE':
+                with state_lock:
+                    turning_in_progress = False
+            elif response.startswith("DISTANCE"):
+                distance = response
+                print(f"Distance from obstacle: {distance}")
+            elif response.startswith("TARGET") or response.startswith("YAW"):
+                print(f"Arduino response: {response}")
+        except Exception as e:
+            print(f"Error reading from Arduino: {e}")
+
+
+arduino_reader_thread = threading.Thread(target=read_message_from_arduino, daemon=True)
+arduino_reader_thread.start()
 
 def save_convo_to_json(user_input, response):
     convo = {
@@ -154,10 +187,8 @@ def speak(text):
 
 def explore_mode():
     detected_walls = {}
-    data = arduino.readline().decode('utf-8').strip()
-    if data.startswith("distance"):
-        distance = data
-    
+    distance = read_message_from_arduino()
+
     is_over = False
 
     prompt = f"""
@@ -184,7 +215,7 @@ def explore_mode():
     messages.append(response.message) # type: ignore
     direction = response.message.content[1:] # type: ignore
     moves_made.append(direction)
-    send_message_to_arduino(direction)
+    send_action_message_to_arduino(direction)
 
 def send_speech_to_ollama(text):
     prompt = text 
@@ -298,6 +329,7 @@ def camera_loop(model, name_queue):
     global frame_count, hunting_mode, target_object
     global latest_face_embedding, pending_greeting
     global angle_x
+    global turning_in_progress, turning_to_face_object_mode
 
     os.makedirs(f'output_frames/objects', exist_ok=True)
     os.makedirs(f'output_frames/faces', exist_ok=True)
@@ -382,11 +414,20 @@ def camera_loop(model, name_queue):
                         class_name = model.names[cls]
                         cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
 
-                        angle_x = find_angle_from_bbox(x1, y1, x2, y2)
+                        center_x, center_y = find_angle_from_bbox(x1, y1, x2, y2)
 
-                        object_crop = frame[int(x1): int(x1) + int(x2), int(y1): int(y1) + int(y2)]
+                        angle_x, angle_y = find_angle_from_pixel_center(center_x, center_y)
 
-                        cv2.putText(frame, f"{class_name} {conf:.2f} {angle_x:.1f} deg", (int(x1), int(y1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2) 
+                        with face_state_lock:
+                            should_turn = turning_to_face_object_mode and not turning_in_progress
+                            if should_turn:
+                                send_turning_message_to_arduino(angle_x)
+                                turning_in_progress = True
+                                break # once an object is detected and the robot is turning, break out of the loop to avoid sending multiple commands
+
+                        object_crop = frame[int(x1) : int(x2), int(y1) : int(y2)]
+
+                        cv2.putText(frame, f"{class_name} {conf:.2f} {angle_x:.3f} deg", (int(x1), int(y1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2) 
                         center_x = (x1 + x2) // 2
                         center_y = (y1 + y2) // 2
                         cv2.imshow("Object Detection", frame)
@@ -521,11 +562,17 @@ while True:
 
         elif "turn" in text:
             switch_animation('talking-animation.gif', 67, 500)
-            future = speak("Ok. It is my time to try the tilt angle logic")
+            with face_state_lock:
+                turning_to_face_object_mode = not turning_to_face_object_mode
+                turning_to_face_object_mode_is_currently_on = turning_to_face_object_mode
+
+            if turning_to_face_object_mode_is_currently_on:
+
+                future = speak("Ok. I will now turn to face the object")
+            else:   
+                future = speak("Ok. I will now stop turning to face the object")
             speaking_time = future.result()
             switch_animation('idle-animation.gif', 67, 500)
-            while current_robot_angle > 0:
-                current_robot_angle = int(send_message_to_arduino(angle_x))
 
         elif "find" in text:
             speak("I got you")

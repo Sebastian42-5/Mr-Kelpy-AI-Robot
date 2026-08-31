@@ -4,10 +4,16 @@ import pickle
 import glob
 import os
 
-CHESSBOARD_SIZE = (9, 6)      # inner corners (columns, rows)
+CHESSBOARD_SIZE = (8, 5)      # inner corners (columns, rows) -- VERIFY this against your printout
 SQUARE_SIZE_MM = 25.0         # measure your actual printed square size
 OUTPUT_PATH = "calibration_data.pkl"
 CAMERA_INDEX = 0
+
+DETECTION_FLAGS = (
+    cv2.CALIB_CB_ADAPTIVE_THRESH
+    + cv2.CALIB_CB_NORMALIZE_IMAGE
+    + cv2.CALIB_CB_FAST_CHECK
+)
 
 
 def run_calibration():
@@ -38,14 +44,19 @@ def run_calibration():
         frame_size = frame.shape[:2][::-1]  # (width, height)
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        found, corners = cv2.findChessboardCorners(gray, CHESSBOARD_SIZE, None)
+        found, corners = cv2.findChessboardCorners(gray, CHESSBOARD_SIZE, DETECTION_FLAGS)
 
         display = frame.copy()
         if found:
             criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
             refined_corners = cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
             cv2.drawChessboardCorners(display, CHESSBOARD_SIZE, refined_corners, found)
+            status_text, status_color = "Board detected - press 'c'", (0, 255, 0)
+        else:
+            status_text, status_color = f"No board found (looking for {CHESSBOARD_SIZE[0]}x{CHESSBOARD_SIZE[1]} inner corners)", (0, 0, 255)
 
+        cv2.putText(display, status_text, (10, 60),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, status_color, 2)
         cv2.putText(display, f"Captured: {captured_count}", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
         cv2.imshow("Calibration - press 'c' to capture, 'q' to finish", display)
