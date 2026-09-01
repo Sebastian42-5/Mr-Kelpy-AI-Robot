@@ -23,9 +23,8 @@ import keyboard
 from skimage.metrics import structural_similarity as ssim
 import queue
 from concurrent.futures import ThreadPoolExecutor
-
-# libraries to install
-
+import pyrealsense2 as rs
+import numpy as np
 from transformers import CLIPProcessor, CLIPModel
 
 # classes created
@@ -86,6 +85,18 @@ frame_count = 0
 frame_skip = 5
 image_count = 0
 
+# depth camera setup
+
+pipeline = rs.pipeline()
+config = rs.config()
+config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
+config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+
+profile = pipeline.start(config)
+
+align_to = rs.stream.color
+align = rs.align(align_to)
+
 # history of moves made
 
 moves_made = []
@@ -108,50 +119,57 @@ def recognize_arduino_port():
         print(f"{p.device} - {p.description}")
     return None
 
-arduino_port = recognize_arduino_port()
+# arduino_port = recognize_arduino_port()
 
 # port = "/dev/ttyACM0"
     
-arduino = serial.Serial(port=arduino_port, baudrate=9600, timeout=0.1)
+# arduino = serial.Serial(port=arduino_port, baudrate=9600, timeout=0.1)
 
-def send_turning_message_to_arduino(delta_angle):
-    global turning_in_progress
-    if turning_in_progress: 
-        return False 
+# def send_turning_message_to_arduino(delta_angle):
+#     global turning_in_progress
+#     if turning_in_progress: 
+#         return False 
     
-    with state_lock:
-        arduino.write(f"Target object is at {delta_angle:.2f} degrees\n".encode('utf-8'))
-    print(f"Sent message to turn {delta_angle:.2f} degrees to Arduino")
-    return True 
+#     with state_lock:
+#         arduino.write(f"Target object is at {delta_angle:.2f} degrees\n".encode('utf-8'))
+#     print(f"Sent message to turn {delta_angle:.2f} degrees to Arduino")
+#     return True 
 
-def send_action_message_to_arduino(action):
-    with face_state_lock:
-        arduino.write(f"The robot should {action}").encode('utf-8')
-        print(f"Sent message to {action} to Arduino")
-
-
-def read_message_from_arduino():
-    global turning_in_progress
-
-    while True: 
-        try:
-            response = arduino.readline().decode('utf-8').strip()
-            if not response:
-                continue 
-            if response == 'DONE':
-                with state_lock:
-                    turning_in_progress = False
-            elif response.startswith("DISTANCE"):
-                distance = response
-                print(f"Distance from obstacle: {distance}")
-            elif response.startswith("TARGET") or response.startswith("YAW"):
-                print(f"Arduino response: {response}")
-        except Exception as e:
-            print(f"Error reading from Arduino: {e}")
+# def send_distance_message_to_arduino(distance):
+#     with state_lock:
+#         arduino.write(f"Target object is at {distance:.2f} cm\n".encode('utf-8'))
+#     print(f"Sent message to go forward {distance:.2f} cm to Arduino")
+#     return True
 
 
-arduino_reader_thread = threading.Thread(target=read_message_from_arduino, daemon=True)
-arduino_reader_thread.start()
+# def send_action_message_to_arduino(action):
+#     with face_state_lock:
+#         arduino.write(f"The robot should {action}".encode('utf-8'))
+#         print(f"Sent message to {action} to Arduino")
+
+
+# def read_message_from_arduino():
+#     global turning_in_progress
+
+#     while True: 
+#         try:
+#             response = arduino.readline().decode('utf-8').strip()
+#             if not response:
+#                 continue 
+#             if response == 'DONE':
+#                 with state_lock:
+#                     turning_in_progress = False
+#             elif response.startswith("DISTANCE"):
+#                 distance = response
+#                 print(f"Distance from obstacle: {distance}")
+#             elif response.startswith("TARGET") or response.startswith("YAW"):
+#                 print(f"Arduino response: {response}")
+#         except Exception as e:
+#             print(f"Error reading from Arduino: {e}")
+
+
+# arduino_reader_thread = threading.Thread(target=read_message_from_arduino, daemon=True)
+# arduino_reader_thread.start()
 
 def save_convo_to_json(user_input, response):
     convo = {
@@ -185,37 +203,37 @@ def speak(text):
     return future
 
 
-def explore_mode():
-    detected_walls = {}
-    distance = read_message_from_arduino()
+# def explore_mode():
+#     detected_walls = {}
+#     distance = read_message_from_arduino()
 
-    is_over = False
+#     is_over = False
 
-    prompt = f"""
+#     prompt = f"""
 
-    You are a robot navigatig in a room 
+#     You are a robot navigatig in a room 
 
-    Look at your previous action, unless it is the first action you do.
-    The distance from an obstacle is {distance}
+#     Look at your previous action, unless it is the first action you do.
+#     The distance from an obstacle is {distance}
 
-    what should you do? 
-    Respond by either: forward, backward, left, or right
+#     what should you do? 
+#     Respond by either: forward, backward, left, or right
 
-    save your actions with an index, so it would be: 1forward, 2left, 3right, etc. 
-    """
+#     save your actions with an index, so it would be: 1forward, 2left, 3right, etc. 
+#     """
 
-    messages = [
-        {
-            "role":"user",
-            "content": prompt
-        },
-    ]
+#     messages = [
+#         {
+#             "role":"user",
+#             "content": prompt
+#         },
+#     ]
 
-    response = chat(model="llama3.2:latest", messages=messages)
-    messages.append(response.message) # type: ignore
-    direction = response.message.content[1:] # type: ignore
-    moves_made.append(direction)
-    send_action_message_to_arduino(direction)
+#     response = chat(model="llama3.2:latest", messages=messages)
+#     messages.append(response.message) # type: ignore
+#     direction = response.message.content[1:] # type: ignore
+#     moves_made.append(direction)
+#     send_action_message_to_arduino(direction)
 
 def send_speech_to_ollama(text):
     prompt = text 
@@ -340,25 +358,38 @@ def camera_loop(model, name_queue):
         try:
 
             timer = cv2.getTickCount()
-            fps = cap.get(cv2.CAP_PROP_FPS)
-            ret, frame = cap.read()
-            if not ret or frame is None:
+
+            rs_frames = pipeline.wait_for_frames()
+
+            aligned_frames = align.process(rs_frames)
+            depth_frame = aligned_frames.get_depth_frame()
+            color_frame = aligned_frames.get_color_frame()
+
+            if not depth_frame or not color_frame:
                 continue
 
             frame_count += 1
 
-            detected_faces = DeepFace.extract_faces(frame, detector_backend='opencv', enforce_detection=False)
+            # convert depth images into np arrays 
+
+            depth_image = np.asanyarray(depth_frame.get_data())
+            color_image = np.asanyarray(color_frame.get_data())
+
+            # fps = pipeline.get_active_profile().get_device().first_color_sensor().get_option(rs.option.frame_rate)
+            
 
             # face detection
+
+            detected_faces = DeepFace.extract_faces(color_image, detector_backend='opencv', enforce_detection=False)
 
             if len(detected_faces) > 0 and (frame_count % frame_skip == 0):
                 print(f"faces detected: {len(detected_faces)}")
                 for face_info in detected_faces:
                     facial_area = face_info['facial_area'] # type: ignore
                     x, y, w, h = facial_area.get('x', 0), facial_area.get('y', 0), facial_area.get('w', 0), facial_area.get('h', 0) # type: ignore
-                    cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 2)
+                    cv2.rectangle(color_image, (x, y), (x + w, y + h), (0, 0, 255), 2)
 
-                    face_crop = frame[y: y + h, x: x + w]
+                    face_crop = color_image[y: y + h, x: x + w]
 
                     if face_crop.size == 0:
                         continue
@@ -380,13 +411,13 @@ def camera_loop(model, name_queue):
                                 name_queue.put(matching_name)
                 
 
-                cv2.imwrite(f"output_frames/faces_frame_{frame_count}.jpg", frame) 
+                cv2.imwrite(f"output_frames/faces_frame_{frame_count}.jpg", color_image) 
 
 
             if frame_count % frame_skip == 0:
                 image_dir = f"output_frames/object/frame_{frame_count}.jpg"
                 file_path = Path(image_dir)
-                cv2.imwrite(image_dir, frame)
+                cv2.imwrite(image_dir, color_image)
                 live_embedding, detected_label = name_and_embed_saved_image(image_dir)
 
             if hunting_mode and target_object:
@@ -398,7 +429,7 @@ def camera_loop(model, name_queue):
                     target_object = ""
 
 
-            results = model(frame, stream=False)
+            results = model(color_image, stream=False)
 
             for r in results:
                 boxes = r.boxes.xyxy.cpu().numpy()
@@ -412,31 +443,33 @@ def camera_loop(model, name_queue):
 
                     if conf > 0.5:
                         class_name = model.names[cls]
-                        cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                        cv2.rectangle(color_image, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
 
                         center_x, center_y = find_angle_from_bbox(x1, y1, x2, y2)
 
                         angle_x, angle_y = find_angle_from_pixel_center(center_x, center_y)
 
+                        distance = depth_frame.get_distance(center_x, center_y) * 100
+
                         with face_state_lock:
                             should_turn = turning_to_face_object_mode and not turning_in_progress
                             if should_turn:
-                                send_turning_message_to_arduino(angle_x)
+                                # send_turning_message_to_arduino(angle_x)
                                 turning_in_progress = True
                                 break # once an object is detected and the robot is turning, break out of the loop to avoid sending multiple commands
 
-                        object_crop = frame[int(x1) : int(x2), int(y1) : int(y2)]
+                        object_crop = color_image[int(x1) : int(x2), int(y1) : int(y2)]
 
-                        cv2.putText(frame, f"{class_name} {conf:.2f} {angle_x:.3f} deg", (int(x1), int(y1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2) 
+                        cv2.putText(color_image, f"{class_name} {conf:.2f} {angle_x:.3f} deg {distance:.2f} cm", (int(x1), int(y1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2) 
                         center_x = (x1 + x2) // 2
                         center_y = (y1 + y2) // 2
-                        cv2.imshow("Object Detection", frame)
+                        cv2.imshow("Object Detection", color_image)
 
 
             x3, y3, x4, y4 = 100, 0, 300, 100
             claw_center_x = (x3 + x4) // 2
             claw_center_y = (y3 + y4) // 2
-            cv2.rectangle(frame, (x3, y3), (x4, y4), (255, 0, 0), 2)
+            cv2.rectangle(color_image, (x3, y3), (x4, y4), (255, 0, 0), 2)
 
             if cv2.waitKey(1) and 0xff == ord("q"):
                 break
@@ -444,7 +477,7 @@ def camera_loop(model, name_queue):
         except Exception as e:
             print(f"Error in camera loop: {e}")
 
-    cap.release()
+    pipeline.stop()
     cv2.destroyAllWindows()
 
 
