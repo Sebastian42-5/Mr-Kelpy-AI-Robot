@@ -33,3 +33,23 @@ Steps to project:
 - Local AI Model
 - Other features: display temperature, play music, etc.
 
+Concepts used in project: 
+
+- Image embedding and cluster generation for face and object recognition
+- Cosine similarity
+- Handling local LLMs with Ollama
+- Robot states
+- IMUs 
+- TTS pipelines
+- Serial communication
+- Threading and threadpool execution
+- Face detection
+- K matrix
+- Camera calibration using the chessboard method
+- Depth Cameras
+- Computer Vision
+
+- Encoded motors 
+
+
+

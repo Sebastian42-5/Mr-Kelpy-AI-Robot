@@ -1,1 +1,3 @@
 /.venv
+output_frames/
+face_memory/
