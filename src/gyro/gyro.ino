@@ -73,7 +73,7 @@ void setup() {
 void loop() {
   readRawData();
 
-  handleTurningCommand();
+  handleCommand();
 
   float gz = (raw_gz - gz_offset) / 131.0; // deg/s
 
@@ -85,22 +85,22 @@ void loop() {
 
   // ultrasonic logic
 
-  digitalWrite(trigPin, LOW);
-  delayMicroseconds(2);      
+  // digitalWrite(trigPin, LOW);
+  // delayMicroseconds(2);      
 
-  digitalWrite(trigPin, HIGH);
-  delayMicroseconds(10);     
-  digitalWrite(trigPin, LOW);
+  // digitalWrite(trigPin, HIGH);
+  // delayMicroseconds(10);     
+  // digitalWrite(trigPin, LOW);
 
-  float duration = pulseIn(echoPin, HIGH); 
+  // float duration = pulseIn(echoPin, HIGH); 
  
-  float distanceCm = (duration * 0.0343) / 2; 
+  // float distanceCm = (duration * 0.0343) / 2; 
 
-  Serial.print("DISTANCE: ");
-  Serial.print(distanceCm);
-  Serial.println(" cm");
+  // Serial.print("DISTANCE: ");
+  // Serial.print(distanceCm);
+  // Serial.println(" cm");
 
-  delay(500); 
+  // delay(500); 
 
   if (robot_state == TURNING) {
     float error = target_yaw - desired_angle_change;
@@ -111,7 +111,7 @@ void loop() {
     if (abs(error) <= TURNING_TOLERANCE) {
       stop_motor();
       robot_state = IDLE;
-      Serial.println("DONE");
+      Serial.println("DONE TURNING");
     } else {
         if(error > 0) {
           turnLeft();
@@ -129,11 +129,13 @@ void loop() {
     last_report_time = current_time;
     }
 
-    elif (robot_state == MOVING_FORWARD) {
+  } else if(robot_state == MOVING_FORWARD) {
+    while(desired_distance_to_travel > 1.5) {
       goForward();
-    } else if (robot_state == MOVING_BACKWARD) {
-      goBackward();
     }
+    stop_motor();
+    robot_state = IDLE;
+    Serial.println("DONE MOVING FORWARD")
   }
 }
 
@@ -195,7 +197,7 @@ void readRawData() {
   raw_gz = Wire.read() << 8 | Wire.read();
 }
 
-void handleTurningCommand() {
+void handleCommand() {
 
   if(Serial.available() > 0) {
     String command = Serial.readStringUntil('\n');
@@ -213,6 +215,11 @@ void handleTurningCommand() {
       robot_state = TURNING;
 
       Serial.println("TARGET: " + String(target_yaw));
+    } else if (command.startsWith("GO FORWARD") && robot_state == IDLE) {
+
+      float desired_distance_to_travel = command.substring(12).toFloat();
+
+      robot_state = MOVING_FORWARD;
     }
   }
 }

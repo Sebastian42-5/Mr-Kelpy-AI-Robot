@@ -119,57 +119,57 @@ def recognize_arduino_port():
         print(f"{p.device} - {p.description}")
     return None
 
-# arduino_port = recognize_arduino_port()
+arduino_port = recognize_arduino_port()
 
-# port = "/dev/ttyACM0"
+port = "/dev/ttyACM0"
     
-# arduino = serial.Serial(port=arduino_port, baudrate=9600, timeout=0.1)
+arduino = serial.Serial(port=arduino_port, baudrate=9600, timeout=0.1)
 
-# def send_turning_message_to_arduino(delta_angle):
-#     global turning_in_progress
-#     if turning_in_progress: 
-#         return False 
+def send_turning_message_to_arduino(delta_angle):
+    global turning_in_progress
+    if turning_in_progress: 
+        return False 
     
-#     with state_lock:
-#         arduino.write(f"Target object is at {delta_angle:.2f} degrees\n".encode('utf-8'))
-#     print(f"Sent message to turn {delta_angle:.2f} degrees to Arduino")
-#     return True 
+    with state_lock:
+        arduino.write(f"TURN {delta_angle:.2f} degrees\n".encode('utf-8'))
+    print(f"Sent message to turn {delta_angle:.2f} degrees to Arduino")
+    return True 
 
-# def send_distance_message_to_arduino(distance):
-#     with state_lock:
-#         arduino.write(f"Target object is at {distance:.2f} cm\n".encode('utf-8'))
-#     print(f"Sent message to go forward {distance:.2f} cm to Arduino")
-#     return True
-
-
-# def send_action_message_to_arduino(action):
-#     with face_state_lock:
-#         arduino.write(f"The robot should {action}".encode('utf-8'))
-#         print(f"Sent message to {action} to Arduino")
+def send_distance_message_to_arduino(distance):
+    with state_lock:
+        arduino.write(f"GO FORWARD {distance:.2f} cm\n".encode('utf-8'))
+    print(f"Sent message to go forward {distance:.2f} cm to Arduino")
+    return True
 
 
-# def read_message_from_arduino():
-#     global turning_in_progress
-
-#     while True: 
-#         try:
-#             response = arduino.readline().decode('utf-8').strip()
-#             if not response:
-#                 continue 
-#             if response == 'DONE':
-#                 with state_lock:
-#                     turning_in_progress = False
-#             elif response.startswith("DISTANCE"):
-#                 distance = response
-#                 print(f"Distance from obstacle: {distance}")
-#             elif response.startswith("TARGET") or response.startswith("YAW"):
-#                 print(f"Arduino response: {response}")
-#         except Exception as e:
-#             print(f"Error reading from Arduino: {e}")
+def send_action_message_to_arduino(action):
+    with face_state_lock:
+        arduino.write(f"The robot should {action}".encode('utf-8'))
+        print(f"Sent message to {action} to Arduino")
 
 
-# arduino_reader_thread = threading.Thread(target=read_message_from_arduino, daemon=True)
-# arduino_reader_thread.start()
+def read_message_from_arduino():
+    global turning_in_progress
+
+    while True: 
+        try:
+            response = arduino.readline().decode('utf-8').strip()
+            if not response:
+                continue 
+            if response == 'DONE':
+                with state_lock:
+                    turning_in_progress = False
+            # elif response.startswith("DISTANCE"):
+            #     distance = response
+            #     print(f"Distance from obstacle: {distance}")
+            elif response.startswith("TARGET") or response.startswith("YAW"):
+                print(f"Arduino response: {response}")
+        except Exception as e:
+            print(f"Error reading from Arduino: {e}")
+
+
+arduino_reader_thread = threading.Thread(target=read_message_from_arduino, daemon=True)
+arduino_reader_thread.start()
 
 def save_convo_to_json(user_input, response):
     convo = {
@@ -203,37 +203,38 @@ def speak(text):
     return future
 
 
-# def explore_mode():
-#     detected_walls = {}
-#     distance = read_message_from_arduino()
+def explore_mode():
+    detected_walls = {}
+    distance = read_message_from_arduino()
 
-#     is_over = False
+    is_over = False
 
-#     prompt = f"""
+    prompt = f"""
 
-#     You are a robot navigatig in a room 
+    You are a robot navigatig in a room 
 
-#     Look at your previous action, unless it is the first action you do.
-#     The distance from an obstacle is {distance}
+    Look at your previous action, unless it is the first action you do.
+    The distance from an obstacle is {distance}
 
-#     what should you do? 
-#     Respond by either: forward, backward, left, or right
+    what should you do? 
+    Respond by either: forward, backward, left, or right
 
-#     save your actions with an index, so it would be: 1forward, 2left, 3right, etc. 
-#     """
+    save your actions with an index, so it would be: 1forward, 2left, 3right, etc. 
+    """
 
-#     messages = [
-#         {
-#             "role":"user",
-#             "content": prompt
-#         },
-#     ]
+    messages = [
+        {
+            "role":"user",
+            "content": prompt
+        },
+    ]
 
-#     response = chat(model="llama3.2:latest", messages=messages)
-#     messages.append(response.message) # type: ignore
-#     direction = response.message.content[1:] # type: ignore
-#     moves_made.append(direction)
-#     send_action_message_to_arduino(direction)
+    response = chat(model="llama3.2:latest", messages=messages)
+    messages.append(response.message) # type: ignore
+    direction = response.message.content[1:] # type: ignore
+    moves_made.append(direction)
+    send_action_message_to_arduino(direction)
+
 
 def send_speech_to_ollama(text):
     prompt = text 
