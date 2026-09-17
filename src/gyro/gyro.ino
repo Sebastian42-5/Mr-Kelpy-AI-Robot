@@ -8,7 +8,10 @@ int16_t temp;
 
 float gx_offset = 0, gy_offset = 0, gz_offset = 0;
 
+float yaw = 0;
 float target_yaw = 0;  // the reference point for the yaw will always be zero 
+float desired_angle_change = 0;
+
 float TURNING_TOLERANCE = 2.0; // how much the robot can deviate from the target angle before it stops turning
 float error = 0; // the difference between the target angle and the current angle
 
@@ -81,7 +84,7 @@ void loop() {
   dt = (current_time - prev_time) / 1000.0;
   prev_time = current_time;
 
-  target_yaw += gz * dt;
+  yaw += gz * dt;
 
   // ultrasonic logic
 
@@ -92,48 +95,41 @@ void loop() {
   delayMicroseconds(10);     
   digitalWrite(trigPin, LOW);
 
-  duration = pulseIn(echoPin, HIGH); 
+  float duration = pulseIn(echoPin, HIGH); 
  
-  distanceCm = (duration * 0.0343) / 2; 
+  float distanceCm = (duration * 0.0343) / 2; 
 
   Serial.print("DISTANCE: ");
   Serial.print(distanceCm);
   Serial.println(" cm");
 
-  delay(500); 
+  delay(100); 
 
   if (robot_state == TURNING) {
-    float error = target_yaw - desired_angle_change;
-
-    while (error > 180) error -= 360; // Normalize to [-180, 180]
-    while (error < -180) error += 360; // Normalize to [-180, 180]
+    float error = target_yaw - yaw;
+    while (error > 180) error -= 360;   // always turn the short way
+    while (error < -180) error += 360;
 
     if (abs(error) <= TURNING_TOLERANCE) {
       stop_motor();
       robot_state = IDLE;
       Serial.println("DONE");
     } else {
-        if(error > 0) {
-          turnLeft();
-        } else {
-          turnRight();
-        } 
-        if (current_time - last_report_time >= REPORT_INTERVAL) {
-          Serial.print("YAW: "); Serial.println(target_yaw);
-          last_report_time = current_time;
-        }
+      if (error > 0) turnRight(); else turnLeft();
+      if (current_time - last_report_time >= REPORT_INTERVAL) {
+        Serial.print("YAW:"); Serial.println(yaw);
+        last_report_time = current_time;
+      }
     }
-
-    elif (current_time - last_report_time >= REPORT_INTERVAL) {
-    Serial.print("YAW: "); Serial.println(target_yaw);
+  } else if (current_time - last_report_time >= REPORT_INTERVAL) {
+    Serial.print("YAW:"); Serial.println(yaw);
     last_report_time = current_time;
-    }
 
-    elif (robot_state == MOVING_FORWARD) {
-      goForward();
-    } else if (robot_state == MOVING_BACKWARD) {
-      goBackward();
-    }
+  } else if (robot_state == MOVING_FORWARD) {
+    goForward();
+
+  } else if (robot_state == MOVING_BACKWARD) {
+    goBackward();
   }
 }
 

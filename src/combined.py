@@ -112,7 +112,7 @@ arduino_port = recognize_arduino_port()
 
 # port = "/dev/ttyACM0"
     
-arduino = serial.Serial(port=arduino_port, baudrate=9600, timeout=0.1)
+arduino = serial.Serial(port="COM3", baudrate=9600, timeout=0.1)
 
 def send_turning_message_to_arduino(delta_angle):
     global turning_in_progress
