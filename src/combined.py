@@ -156,12 +156,10 @@ def read_message_from_arduino():
             response = arduino.readline().decode('utf-8').strip()
             if not response:
                 continue 
-            if response == 'DONE':
+            if response == 'DONE TURNING':
                 with state_lock:
                     turning_in_progress = False
-            # elif response.startswith("DISTANCE"):
-            #     distance = response
-            #     print(f"Distance from obstacle: {distance}")
+                    if moving_phase 
             elif response.startswith("TARGET") or response.startswith("YAW"):
                 print(f"Arduino response: {response}")
         except Exception as e:
