@@ -17,6 +17,10 @@ float error = 0; // the difference between the target angle and the current angl
 
 float desired_distance_to_travel = 0; // the distance the robot should travel forward in centimeters
 
+
+float speed = 15.0; // the speed of the robot in centimeters per second
+unsigned long move_start_time = 0; // the time when the robot started moving
+
 enum RobotState {
   IDLE,
   TURNING,
@@ -77,7 +81,6 @@ void setup() {
 
 void loop() {
   readRawData();
-
   handleSerialMessage();
 
   float gz = (raw_gz - gz_offset) / 131.0; // deg/s
@@ -88,25 +91,8 @@ void loop() {
 
   yaw += gz * dt;
 
-  // ultrasonic logic
 
-  // digitalWrite(trigPin, LOW);
-  // delayMicroseconds(2);      
-
-  // digitalWrite(trigPin, HIGH);
-  // delayMicroseconds(10);     
-  // digitalWrite(trigPin, LOW);
-
-  // float duration = pulseIn(echoPin, HIGH); 
- 
-  // float distanceCm = (duration * 0.0343) / 2; 
-
-  // Serial.print("DISTANCE: ");
-  // Serial.print(distanceCm);
-  // Serial.println(" cm");
-
-  // delay(500); 
-
+  // Turning logic
 
   if (robot_state == TURNING) {
     float error = target_yaw - yaw;
@@ -117,27 +103,32 @@ void loop() {
       stop_motor();
       robot_state = IDLE;
       Serial.println("DONE TURNING");
+
     } else {
       if (error > 0) turnRight(); else turnLeft();
-      if (current_time - last_report_time >= REPORT_INTERVAL) {
-        Serial.print("YAW:"); Serial.println(yaw);
-        last_report_time = current_time;
-      }
     }
+
+  // Moving forward logic
+
   } else if(robot_state == MOVING_FORWARD) {
-      while(desired_distance_to_travel > 1.5) {
+
+      float time_since_move_start = (current_time - move_start_time) / 1000.0; // in seconds
+      float distance_traveled = speed * time_since_move_start; // in centimeters
+      
+      if (distance_traveled >= desired_distance_to_travel) {
+        stop_motor();
+        robot_state = IDLE;
+        Serial.println("DONE MOVING FORWARD");
+      } else {
         goForward();
       }
-    
-      stop_motor();
-      robot_state = IDLE;
-      Serial.println("DONE MOVING FORWARD");
-  }
+    }
 
   } if (current_time - last_report_time >= REPORT_INTERVAL) {
     Serial.print("YAW:"); Serial.println(yaw);
     last_report_time = current_time;
-}
+  }
+
 
 void turnRight() {
   digitalWrite(in1, HIGH);
@@ -205,7 +196,7 @@ void handleSerialMessage() {
 
     if (message.startsWith("TURN") && robot_state == IDLE) {
 
-      float desired_angle_change = message.substring(5).toFloat(); // Extract the desired angle change from the message
+      desired_angle_change = message.substring(5).toFloat(); // Extract the desired angle change from the message
 
       target_yaw = yaw + desired_angle_change; // Set the target yaw based on the current yaw and the desired change
       
@@ -217,8 +208,8 @@ void handleSerialMessage() {
       Serial.println("TARGET: " + String(target_yaw));
     } else if (message.startsWith("GO FORWARD") && robot_state == IDLE) {
 
-        float desired_distance_to_travel = message.substring(11).toFloat();
-
+        desired_distance_to_travel = message.substring(11).toFloat();
+        move_start_time = millis();
         robot_state = MOVING_FORWARD;
     }
   }

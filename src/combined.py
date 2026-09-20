@@ -140,7 +140,7 @@ def send_turning_message_to_arduino(delta_angle):
     if turning_in_progress: 
         return False # this is to avoid sending multiple turning commands to the Arduino while it is still processing a previous one
     
-    with state_lock:
+    with face_state_lock:
         arduino.write(f"TURN {delta_angle:.2f} degrees\n".encode('utf-8'))
     print(f"Sent message to turn {delta_angle:.2f} degrees to Arduino")
     return True 
@@ -162,7 +162,7 @@ def send_action_message_to_arduino(action):
 
 
 def read_message_from_arduino():
-    global turning_in_progress
+    global turning_in_progress, moving_forward_in_progress, approaching_phase_type
 
     while True: 
         try:
@@ -170,15 +170,16 @@ def read_message_from_arduino():
             if not response:
                 continue 
             if response == 'DONE TURNING':
-                with state_lock:
+                with face_state_lock:
                     turning_in_progress = False
+                    if approaching_phase_type == 'turning':
+                        approaching_phase_type = 'moving'
             elif response == 'DONE MOVING FORWARD':
-                with state_lock:
+                with face_state_lock:
                     moving_forward_in_progress = False
-
-            # elif response.startswith("DISTANCE"):
-            #     distance = response
-            #     print(f"Distance from obstacle: {distance}")
+                    if approaching_phase_type == 'moving':
+                        approaching_phase_type = None
+                    
             elif response.startswith("TARGET") or response.startswith("YAW"):
                 print(f"Arduino response: {response}")
         except Exception as e:
@@ -473,13 +474,11 @@ def camera_loop(model, name_queue):
                         # dealing with the two moving states of the robot for object hunting given the object detection loop 
 
                         with face_state_lock:
-                            should_turn = turning_to_face_object_mode and not turning_in_progress
-                            should_move_forward = moving_towards_object_mode and not moving_forward_in_progress
-                            if should_turn:
+                            if approaching_phase_type == 'turning':
                                 send_turning_message_to_arduino(angle_x)
                                 turning_in_progress = True
                                 break # once an object is detected and the robot is turning, break out of the loop to avoid sending multiple commands
-                            elif should_move_forward:
+                            elif approaching_phase_type == 'moving':
                                 send_distance_message_to_arduino(distance)
                                 moving_forward_in_progress = True
                                 break # once an object is detected and the robot is moving forward, break out of the loop to avoid sending multiple commands
@@ -602,21 +601,21 @@ while True:
             future = speak("Ok. Moving forward now.")
             speaking_time = future.result()
             switch_animation('idle-animation.gif', 67, 500)
-            # send_message_to_arduino("move forward")
+            send_action_message_to_arduino("move forward")
 
         elif "backward" in text:
             switch_animation('talking-animation.gif', 67, 500)
             future = speak("Ok. Moving backward now")
             speaking_time = future.result()
             switch_animation('idle-animation.gif', 67, 500)
-            # send_message_to_arduino("move backward")
+            send_action_message_to_arduino("move backward")
         
         elif "explore" in text:
             switch_animation('talking-animation.gif', 67, 500)
             future = speak("Ok. It is my time to explore")
             speaking_time = future.result()
             switch_animation('idle-animation.gif', 67, 500)
-            # explore_mode()
+            explore_mode()
 
         elif "turn" in text:   #this is the mode where the robot with detect the nearest object, turn to face it, and move towards it until it is right next to it 
             switch_animation('talking-animation.gif', 67, 500)
@@ -642,8 +641,8 @@ while True:
                 hook = "find the"
                 detected_object = text.replace(hook, "")
                 target_object = detected_object
-            # if hunting_mode:
-                # explore_mode()
+            if hunting_mode:
+                explore_mode()
         
         elif "i am" in text:
             name = text.split("i am", 1)[-1].strip()
