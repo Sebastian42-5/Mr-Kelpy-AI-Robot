@@ -58,8 +58,18 @@ target_object = ""
 cam_thread_running = False
 face_detection_mode = False
 object_found = False
+
+# turning and moving forward flags 
+
 turning_in_progress = False 
 turning_to_face_object_mode = False 
+moving_forward_in_progress = False
+moving_towards_object_mode = False
+
+approaching_phase_type = None
+
+
+
 
 arduino_write_block = threading.Lock()
 
@@ -128,7 +138,7 @@ arduino = serial.Serial(port="COM3", baudrate=9600, timeout=0.1)
 def send_turning_message_to_arduino(delta_angle):
     global turning_in_progress
     if turning_in_progress: 
-        return False 
+        return False # this is to avoid sending multiple turning commands to the Arduino while it is still processing a previous one
     
     with state_lock:
         arduino.write(f"TURN {delta_angle:.2f} degrees\n".encode('utf-8'))
@@ -136,6 +146,9 @@ def send_turning_message_to_arduino(delta_angle):
     return True 
 
 def send_distance_message_to_arduino(distance):
+    global moving_forward_in_progress
+    if moving_forward_in_progress:
+        return False # this is to avoid sending multiple moving forward commands to the Arduino while it is still processing a previous one
     with state_lock:
         arduino.write(f"GO FORWARD {distance:.2f} cm\n".encode('utf-8'))
     print(f"Sent message to go forward {distance:.2f} cm to Arduino")
@@ -156,9 +169,13 @@ def read_message_from_arduino():
             response = arduino.readline().decode('utf-8').strip()
             if not response:
                 continue 
-            if response == 'DONE':
+            if response == 'DONE TURNING':
                 with state_lock:
                     turning_in_progress = False
+            elif response == 'DONE MOVING FORWARD':
+                with state_lock:
+                    moving_forward_in_progress = False
+
             # elif response.startswith("DISTANCE"):
             #     distance = response
             #     print(f"Distance from obstacle: {distance}")
@@ -349,6 +366,7 @@ def camera_loop(model, name_queue):
     global latest_face_embedding, pending_greeting
     global angle_x
     global turning_in_progress, turning_to_face_object_mode
+    global moving_forward_in_progress, moving_towards_object_mode
 
     os.makedirs(f'output_frames/objects', exist_ok=True)
     os.makedirs(f'output_frames/faces', exist_ok=True)
@@ -452,12 +470,19 @@ def camera_loop(model, name_queue):
 
                         distance = depth_frame.get_distance(center_x, center_y) * 100
 
+                        # dealing with the two moving states of the robot for object hunting given the object detection loop 
+
                         with face_state_lock:
                             should_turn = turning_to_face_object_mode and not turning_in_progress
+                            should_move_forward = moving_towards_object_mode and not moving_forward_in_progress
                             if should_turn:
-                                # send_turning_message_to_arduino(angle_x)
+                                send_turning_message_to_arduino(angle_x)
                                 turning_in_progress = True
                                 break # once an object is detected and the robot is turning, break out of the loop to avoid sending multiple commands
+                            elif should_move_forward:
+                                send_distance_message_to_arduino(distance)
+                                moving_forward_in_progress = True
+                                break # once an object is detected and the robot is moving forward, break out of the loop to avoid sending multiple commands
 
                         object_crop = color_image[int(x1) : int(x2), int(y1) : int(y2)]
 
@@ -516,7 +541,6 @@ def run_tk():
 
 def switch_animation(gif_name, frame_delay=67, loop_delay=500):
    root.after(0, lambda: player.switch_gif(gif_name, frame_delay, loop_delay))
-
 
 tk_thread_running = True
 tk_thread = threading.Thread(target=run_tk, daemon=True)
@@ -594,18 +618,21 @@ while True:
             switch_animation('idle-animation.gif', 67, 500)
             # explore_mode()
 
-        elif "turn" in text:
+        elif "turn" in text:   #this is the mode where the robot with detect the nearest object, turn to face it, and move towards it until it is right next to it 
             switch_animation('talking-animation.gif', 67, 500)
             with face_state_lock:
-                turning_to_face_object_mode = not turning_to_face_object_mode
-                turning_to_face_object_mode_is_currently_on = turning_to_face_object_mode
+                if approaching_phase_type == None:
+                    approaching_phase_type = "turning"
+                else:
+                    approaching_phase_type = None
 
-            if turning_to_face_object_mode_is_currently_on:
+            if approaching_phase_type == "turning":
 
                 future = speak("Ok. I will now turn to face the object")
             else:   
                 future = speak("Ok. I will now stop turning to face the object")
             speaking_time = future.result()
+
             switch_animation('idle-animation.gif', 67, 500)
 
         elif "find" in text:
