@@ -137,27 +137,30 @@ arduino = serial.Serial(port="COM3", baudrate=9600, timeout=0.1)
 
 def send_turning_message_to_arduino(delta_angle):
     global turning_in_progress
-    if turning_in_progress: 
-        return False # this is to avoid sending multiple turning commands to the Arduino while it is still processing a previous one
-    
     with face_state_lock:
+        if turning_in_progress: 
+            return False # this is to avoid sending multiple turning commands to the Arduino while it is still processing a previous one
+        turning_in_progress = True
+    with arduino_write_block:
         arduino.write(f"TURN {delta_angle:.2f} degrees\n".encode('utf-8'))
     print(f"Sent message to turn {delta_angle:.2f} degrees to Arduino")
     return True 
 
 def send_distance_message_to_arduino(distance):
     global moving_forward_in_progress
-    if moving_forward_in_progress:
-        return False # this is to avoid sending multiple moving forward commands to the Arduino while it is still processing a previous one
-    with state_lock:
+    with face_state_lock:
+        if moving_forward_in_progress:
+            return False # this is to avoid sending multiple moving forward commands to the Arduino while it is still processing a previous one
+        moving_forward_in_progress = True
+    with arduino_write_block:
         arduino.write(f"GO FORWARD {distance:.2f} cm\n".encode('utf-8'))
     print(f"Sent message to go forward {distance:.2f} cm to Arduino")
     return True
 
 
 def send_action_message_to_arduino(action):
-    with face_state_lock:
-        arduino.write(f"The robot should {action}".encode('utf-8'))
+    with arduino_write_block:
+        # arduino.write(f"The robot should {action}".encode('utf-8'))
         print(f"Sent message to {action} to Arduino")
 
 
@@ -280,9 +283,9 @@ def name_and_embed_saved_image(image_path):
     with torch.no_grad():
         outputs = embed_model(**text_inputs)
 
-    logits = outputs.logits_per_image()
+    logits = outputs.logits_per_image
     probs = logits.softmax(dim=-1).squeeze(0)
-    best_idx = probs.arg_max().item()
+    best_idx = probs.argmax().item()
     best_label = possible_labels[best_idx].replace("a photo of a", "")
     best_confidence = probs[best_idx].item()
 
@@ -291,10 +294,10 @@ def name_and_embed_saved_image(image_path):
     # saving the image into the correct folder
     
     label_folder = f"output_frames/{best_label}"
-    os.makedirs(label_folder)
+    os.makedirs(label_folder, exist_ok=True)
     new_label = os.path.basename(image_path)
     new_image_path = os.path.join(label_folder, new_label)
-    pil_image.save(image_path)
+    pil_image.save(new_image_path)
 
     # cache the embedding of the image
 
@@ -326,8 +329,8 @@ def get_image_embedding(pil_image):
 def load_cache():
     if os.path.exists(cache_path):
         with open(cache_path, "rb") as f:
-            pickle.load(f)
-    return []
+            file = pickle.load(f)
+    return file 
 
 def save_cache(cache):
     with open(cache_path, "wb") as f:
@@ -435,7 +438,7 @@ def camera_loop(model, name_queue):
 
 
             if frame_count % frame_skip == 0:
-                image_dir = f"output_frames/object/frame_{frame_count}.jpg"
+                image_dir = f"output_frames/objects/frame_{frame_count}.jpg"
                 file_path = Path(image_dir)
                 cv2.imwrite(image_dir, color_image)
                 live_embedding, detected_label = name_and_embed_saved_image(image_dir)
@@ -474,14 +477,16 @@ def camera_loop(model, name_queue):
                         # dealing with the two moving states of the robot for object hunting given the object detection loop 
 
                         with face_state_lock:
-                            if approaching_phase_type == 'turning':
-                                send_turning_message_to_arduino(angle_x)
-                                turning_in_progress = True
-                                break # once an object is detected and the robot is turning, break out of the loop to avoid sending multiple commands
-                            elif approaching_phase_type == 'moving':
-                                send_distance_message_to_arduino(distance)
-                                moving_forward_in_progress = True
-                                break # once an object is detected and the robot is moving forward, break out of the loop to avoid sending multiple commands
+                            phase = approaching_phase_type
+                        if approaching_phase_type == 'turning':
+                            send_turning_message_to_arduino(angle_x)
+                            print(f"turn {angle_x} degrees")
+                            break # once an object is detected and the robot is turning, break out of the loop to avoid sending multiple commands
+
+                        elif approaching_phase_type == 'moving':
+                            send_distance_message_to_arduino(distance)
+                            print(f"continue straight {distance} cm")
+                            break # once an object is detected and the robot is moving forward, break out of the loop to avoid sending multiple commands
 
                         object_crop = color_image[int(x1) : int(x2), int(y1) : int(y2)]
 
@@ -617,7 +622,7 @@ while True:
             switch_animation('idle-animation.gif', 67, 500)
             explore_mode()
 
-        elif "turn" in text:   #this is the mode where the robot with detect the nearest object, turn to face it, and move towards it until it is right next to it 
+        elif "apple" in text:   #this is the mode where the robot with detect the nearest object, turn to face it, and move towards it until it is right next to it 
             switch_animation('talking-animation.gif', 67, 500)
             with face_state_lock:
                 if approaching_phase_type == None:

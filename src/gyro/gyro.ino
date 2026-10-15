@@ -44,6 +44,14 @@ bool turningDone = false;
 int echoPin = 12;
 int trigPin = 11;
 
+bool isIMUConnected(byte address) {
+  Wire.beginTransmission(address);
+  byte error = Wire.endTransmission();
+  return (error == 0); // 0 means the device acknowledged the transmission
+}
+
+
+
 void setup() {
   pinMode(ena, OUTPUT); pinMode(in1, OUTPUT); pinMode(in2, OUTPUT);
   pinMode(in3, OUTPUT); pinMode(in4, OUTPUT); pinMode(enb, OUTPUT);
@@ -76,6 +84,13 @@ void setup() {
   gz_offset = (float)sum_gz / samples;
   Serial.println("Calibration complete.");
 
+  if(isIMUConnected(MPU)){
+    Serial.println("IMU is connected");
+  } else {
+    Serial.println("IMU is not connected");
+  }
+
+
   prev_time = millis();
 }
 
@@ -91,10 +106,11 @@ void loop() {
 
   yaw += gz * dt;
 
+  if (current_time - last_report_time >= REPORT_INTERVAL) {
+    Serial.print("YAW:"); Serial.println(yaw);
+    last_report_time = current_time;
 
-  // Turning logic
-
-  if (robot_state == TURNING) {
+  } if (robot_state == TURNING) {
     float error = target_yaw - yaw;
     while (error > 180) error -= 360;   // always turn the short way
     while (error < -180) error += 360;
@@ -123,12 +139,7 @@ void loop() {
         goForward();
       }
     }
-
-  } if (current_time - last_report_time >= REPORT_INTERVAL) {
-    Serial.print("YAW:"); Serial.println(yaw);
-    last_report_time = current_time;
   }
-
 
 void turnRight() {
   digitalWrite(in1, HIGH);

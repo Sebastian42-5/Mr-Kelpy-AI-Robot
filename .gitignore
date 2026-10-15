@@ -1,3 +1,7 @@
-/.venv
+.venv/
 output_frames/
 face_memory/
+face_images/
+output_frames/
+__pychache__/
+*.pyc 
