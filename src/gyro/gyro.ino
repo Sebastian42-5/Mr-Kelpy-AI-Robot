@@ -59,6 +59,8 @@ void setup() {
   pinMode(trigPin, OUTPUT); pinMode(echoPin, INPUT);
 
 
+  while (!Serial);
+  Serial.println("Scanning...");
 
   Wire.begin();
   Serial.begin(9600);

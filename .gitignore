@@ -1,4 +1,5 @@
 .venv/
+.vscode/
 output_frames/
 face_memory/
 face_images/

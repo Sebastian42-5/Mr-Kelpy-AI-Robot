@@ -18,4 +18,5 @@ class CustomRobotKWS(Dataset):
         self.file_list = []
 
         for category in self.class_to_index_mapping.keys():
+            pass
             

@@ -129,9 +129,9 @@ def recognize_arduino_port():
         print(f"{p.device} - {p.description}")
     return None
 
-arduino_port = recognize_arduino_port()
+# arduino_port = recognize_arduino_port()
 
-port = "/dev/ttyACM0"
+# port = "/dev/ttyACM0"
     
 arduino = serial.Serial(port="COM3", baudrate=9600, timeout=0.1)
 
@@ -323,14 +323,16 @@ def get_image_embedding(pil_image):
     inputs = processor(images=pil_image, return_tensors="pt")
     with torch.no_grad():
         image_embedding = embed_model.get_image_features(**inputs)
+        if not isinstance(image_embedding, torch.Tensor):
+            image_embedding = image_embedding.pooler_output
         image_embedding = image_embedding / image_embedding.norm(p=2, dim=-1, keepdim=True)
     return image_embedding.squeeze(0)
 
 def load_cache():
     if os.path.exists(cache_path):
         with open(cache_path, "rb") as f:
-            file = pickle.load(f)
-    return file 
+            return pickle.load(f)
+    return []
 
 def save_cache(cache):
     with open(cache_path, "wb") as f:
