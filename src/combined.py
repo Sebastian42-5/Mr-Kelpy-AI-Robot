@@ -129,6 +129,19 @@ def recognize_arduino_port():
         print(f"{p.device} - {p.description}")
     return None
 
+def find_arduino():
+    ports = serial.tools.list_ports.comports()
+    for port in ports:
+        # Check if 'arduino' is in the description (case-insensitive)
+        if "arduino" in port.description.lower():
+            print(f"✅ Arduino found on port: {port.device} ({port.description})")
+            return port.device
+            
+    print("❌ No Arduino detected. Check your USB connection.")
+    return None
+
+arduino_port = find_arduino()
+
 # arduino_port = recognize_arduino_port()
 
 # port = "/dev/ttyACM0"

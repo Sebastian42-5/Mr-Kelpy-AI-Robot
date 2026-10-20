@@ -51,15 +51,12 @@ bool isIMUConnected(byte address) {
 }
 
 
-
 void setup() {
   pinMode(ena, OUTPUT); pinMode(in1, OUTPUT); pinMode(in2, OUTPUT);
   pinMode(in3, OUTPUT); pinMode(in4, OUTPUT); pinMode(enb, OUTPUT);
 
-  pinMode(trigPin, OUTPUT); pinMode(echoPin, INPUT);
+  // pinMode(trigPin, OUTPUT); pinMode(echoPin, INPUT);
 
-
-  while (!Serial);
   Serial.println("Scanning...");
 
   Wire.begin();
